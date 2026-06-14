@@ -4,7 +4,9 @@ const state = {
   moderation: null,
   tickets: null,
   badges: null,
-  shop: null
+  shop: null,
+  automod: null,
+  logs: null
 };
 
 const currency = new Intl.NumberFormat('pt-BR');
@@ -145,10 +147,10 @@ function renderModeration(data) {
   } else {
     tbody.innerHTML = rows.map(row => `
       <tr>
-        <td><span class="chip">${row.action}</span></td>
+        <td><span class="chip">${row.case_id || row.action}</span></td>
         <td>${row.user_id}</td>
         <td>${row.moderator_id || '-'}</td>
-        <td>${row.reason || '-'}</td>
+        <td><strong>${row.action}</strong><br>${row.reason || '-'}</td>
         <td>${formatDate(row.created_at)}</td>
       </tr>
     `).join('');
@@ -171,8 +173,8 @@ function renderTickets(data) {
   $('ticketList').innerHTML = open.length ? open.map(ticket => `
     <div class="ticket-item">
       <div>
-        <div class="ticket-title">#${ticket.channel_id}</div>
-        <div class="ticket-meta">${ticket.category || 'Ticket'} · user ${ticket.user_id}</div>
+        <div class="ticket-title">${ticket.subject || `#${ticket.channel_id}`}</div>
+        <div class="ticket-meta">${ticket.category || 'Ticket'} · ${ticket.status || 'open'} · ${ticket.priority || 'normal'} · user ${ticket.user_id}</div>
       </div>
       <span class="badge ok">${formatDate(ticket.created_at)}</span>
     </div>
@@ -207,7 +209,7 @@ function renderShop(rows) {
     <div class="shop-item">
       <div>
         <div class="leader-name">${item.name}</div>
-        <div class="leader-meta">${item.description || 'Item RoguePoke'} · ID ${item.key}</div>
+        <div class="leader-meta">${item.description || 'Item RoguePoke'} · ${item.category || 'general'} · ID ${item.key}</div>
       </div>
       <div class="shop-price">
         <strong>${currency.format(item.price_coins || 0)} + ${currency.format(item.price_cp || 0)}</strong>
@@ -216,6 +218,57 @@ function renderShop(rows) {
       </div>
     </div>
   `).join('') : '<div class="empty">A loja ainda nao tem itens.</div>';
+}
+
+function renderAutomod(config) {
+  const target = $('automodList');
+  if (!target) return;
+
+  const entries = Object.entries(config || {});
+  target.innerHTML = entries.length ? entries.map(([name, value]) => `
+    <div class="module-card">
+      <strong>${name}</strong>
+      <span>${JSON.stringify(value.config || {})}</span>
+      <span class="badge ${value.enabled ? 'ok' : 'bad'}">${value.enabled ? 'Ativo' : 'Inativo'}</span>
+    </div>
+  `).join('') : '<div class="empty">AutoMod ainda nao configurado.</div>';
+}
+
+function renderLogs(groups) {
+  const target = $('logGroups');
+  if (!target) return;
+
+  const labels = {
+    cadastro: 'Cadastro',
+    moderacao: 'Moderacao',
+    tickets: 'Tickets',
+    mensagens: 'Mensagens',
+    cargos: 'Cargos',
+    canais: 'Canais',
+    automod: 'AutoMod',
+    economia: 'Economia'
+  };
+
+  target.innerHTML = Object.entries(labels).map(([key, label]) => {
+    const rows = (groups?.[key] || []).slice(0, 8);
+    return `
+      <article class="log-card">
+        <div class="log-card-head">
+          <strong>${label}</strong>
+          <span class="badge neutral">${rows.length}</span>
+        </div>
+        <div class="log-list">
+          ${rows.length ? rows.map(row => `
+            <div class="log-row">
+              <span class="chip">${row.event_type || key}</span>
+              <strong>${row.summary || '-'}</strong>
+              <small>${formatDate(row.created_at)}</small>
+            </div>
+          `).join('') : '<div class="empty">Sem eventos recentes.</div>'}
+        </div>
+      </article>
+    `;
+  }).join('');
 }
 
 function renderAdminOptions(badges) {
@@ -259,13 +312,15 @@ async function refresh() {
   $('refreshBtn').textContent = 'Atualizando...';
 
   try {
-    const [overview, leaderboard, moderation, tickets, badges, shop] = await Promise.all([
+    const [overview, leaderboard, moderation, tickets, badges, shop, automod, logs] = await Promise.all([
       fetchJSON('/api/overview'),
       fetchJSON('/api/leaderboard'),
       fetchJSON('/api/moderation'),
       fetchJSON('/api/tickets'),
       fetchJSON('/api/badges'),
-      fetchJSON('/api/shop')
+      fetchJSON('/api/shop'),
+      fetchJSON('/api/automod'),
+      fetchJSON('/api/logs')
     ]);
 
     state.overview = overview;
@@ -274,6 +329,8 @@ async function refresh() {
     state.tickets = tickets;
     state.badges = badges;
     state.shop = shop;
+    state.automod = automod;
+    state.logs = logs;
 
     renderHealth(overview);
     renderOverview(overview);
@@ -282,6 +339,8 @@ async function refresh() {
     renderTickets(tickets);
     renderBadges(badges);
     renderShop(shop);
+    renderAutomod(automod);
+    renderLogs(logs);
     renderAdminOptions(badges);
 
     setText('lastUpdated', `Atualizado ${dateTime.format(new Date())}`);
@@ -323,6 +382,30 @@ $('badgeForm')?.addEventListener('submit', event => {
   event.preventDefault();
   handleAdminSubmit(event.currentTarget, '/api/admin/badges', 'Badge entregue.');
 });
+
+$('automodForm')?.addEventListener('submit', event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const values = formValues(form);
+  const body = {
+    ruleName: values.ruleName,
+    enabled: values.enabled === 'true'
+  };
+  if (values.fieldA) body[values.fieldA] = parseAutomodValue(values.valueA);
+  if (values.fieldB) body[values.fieldB] = parseAutomodValue(values.valueB);
+  setAdminResult('Salvando AutoMod...', 'neutral');
+  postJSON('/api/admin/automod', body)
+    .then(() => {
+      setAdminResult('AutoMod atualizado.', 'ok');
+      return refresh();
+    })
+    .catch(error => setAdminResult(error.message, 'bad'));
+});
+
+function parseAutomodValue(value) {
+  if (/^-?\d+$/.test(String(value || '').trim())) return Number(value);
+  return value;
+}
 
 refresh();
 setInterval(refresh, 30000);

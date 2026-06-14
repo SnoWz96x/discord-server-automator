@@ -40,16 +40,17 @@ The current included blueprint is a **RoguePoke demo community**. The project it
 - Config-driven Discord server setup.
 - Verification flow with member role.
 - Language roles.
-- Ticket system with private channels, claim, close and transcript.
-- Moderation commands and dashboard actions.
+- Ticket system with modal intake, priority, status, staff notes, reopen flow and Markdown/HTML transcript.
+- Moderation commands, case IDs and dashboard actions.
 - AutoMod rules for spam, caps, invites and links.
-- XP, ranks and level rewards.
+- XP, ranks, profile cards, quests and level rewards.
 - Economy with coins and CP.
-- Shop with real resource spending.
+- Categorized shop with real coin/CP spending, stock and limited-time item support.
 - Badges that can map to visible Discord roles.
 - Collectible creature system with capture attempts.
 - Local dashboard with health, tickets, logs, economy, shop and admin controls.
 - Smoke and system tests.
+- Docker, GitHub Actions CI and environment validation helpers.
 
 ## Repository Scope
 
@@ -218,10 +219,20 @@ Moderation:
 
 - `/warn`
 - `/warnings`
+- `/case`
+- `/cases`
+- `/reason`
+- `/modhistory`
 - `/mute`
 - `/kick`
 - `/ban`
 - `/clear`
+
+Progression and support:
+
+- `/profile`
+- `/quests`
+- `/ticket`
 
 ## Economy Loop
 
@@ -266,7 +277,9 @@ The dashboard currently provides:
 - channel count;
 - XP, coins and CP stats;
 - moderation logs;
+- moderation cases;
 - ticket overview;
+- AutoMod configuration;
 - shop overview;
 - badge overview;
 - admin actions.

@@ -10,7 +10,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', 'discord-bot', '.env
 const app = express();
 const port = Number(process.env.DASHBOARD_PORT || process.env.PORT || 3000);
 const host = process.env.DASHBOARD_HOST || '127.0.0.1';
-const dbPath = path.join(__dirname, '..', 'roguepoke.db');
+const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '..', 'roguepoke.db');
 const botPath = path.join(__dirname, '..', 'discord-bot', 'index.js').toLowerCase();
 const botPidPath = path.join(__dirname, '..', 'discord-bot', 'bot.pid');
 const db = new Database(dbPath, { readonly: false });
@@ -101,10 +101,16 @@ async function getDiscordHealth() {
   } catch (error) {
     return {
       online: false,
-      error: error.message,
+      error: sanitizeError(error.message),
       checkedAt: new Date().toISOString()
     };
   }
+}
+
+function sanitizeError(message) {
+  const text = String(message || 'Discord API request failed');
+  if (text.includes('<!DOCTYPE') || text.includes('<html')) return 'Discord API retornou uma resposta inesperada.';
+  return text.slice(0, 240);
 }
 
 async function getProcessHealth() {
@@ -207,7 +213,7 @@ function getModeration() {
 
   return {
     recent: getAll(
-      'SELECT * FROM moderation WHERE guild_id = ? ORDER BY created_at DESC LIMIT 50',
+      'SELECT * FROM moderation WHERE guild_id = ? ORDER BY COALESCE(case_number, id) DESC LIMIT 50',
       guildId
     ),
     byAction: getAll(
@@ -215,6 +221,78 @@ function getModeration() {
       guildId
     )
   };
+}
+
+function getAutomodConfig() {
+  const guildId = process.env.GUILD_ID;
+  if (!tableExists('automod')) return {};
+  const rows = getAll('SELECT rule_name, enabled, config FROM automod WHERE guild_id = ? ORDER BY rule_name ASC', guildId);
+  return Object.fromEntries(rows.map(row => [row.rule_name, {
+    enabled: Boolean(row.enabled),
+    config: safeJSON(row.config, {})
+  }]));
+}
+
+function saveAutomodRule(ruleName, body) {
+  const guildId = process.env.GUILD_ID;
+  const allowed = new Set(['antiSpam', 'antiCaps', 'antiInvite', 'antiLink', 'bannedWords']);
+  if (!allowed.has(ruleName)) {
+    const error = new Error('Regra de AutoMod invalida.');
+    error.status = 400;
+    throw error;
+  }
+
+  const config = { ...body };
+  delete config.ruleName;
+  delete config.enabled;
+
+  for (const key of Object.keys(config)) {
+    if (typeof config[key] === 'string' && config[key].includes(',')) {
+      config[key] = config[key].split(',').map(item => item.trim()).filter(Boolean);
+    }
+  }
+
+  db.prepare('INSERT OR REPLACE INTO automod (guild_id, rule_name, enabled, config) VALUES (?, ?, ?, ?)')
+    .run(guildId, ruleName, body.enabled ? 1 : 0, JSON.stringify(config));
+
+  return { ruleName, enabled: Boolean(body.enabled), config };
+}
+
+function nextCaseNumber(guildId) {
+  return Number(getOne('SELECT COALESCE(MAX(case_number), 0) + 1 as next FROM moderation WHERE guild_id = ?', guildId)?.next || 1);
+}
+
+function formatCaseId(caseNumber) {
+  return `CASE-${String(caseNumber).padStart(5, '0')}`;
+}
+
+function addModerationCase({ guildId, userId, moderatorId, action, reason, duration = null, status = 'open' }) {
+  const caseNumber = nextCaseNumber(guildId);
+  const caseId = formatCaseId(caseNumber);
+  db.prepare(`
+    INSERT INTO moderation (guild_id, case_number, case_id, user_id, moderator_id, action, reason, duration, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(guildId, caseNumber, caseId, userId, moderatorId, action, reason, duration, status);
+  const modCase = getOne('SELECT * FROM moderation WHERE guild_id = ? AND case_number = ?', guildId, caseNumber);
+  addEventLog({
+    guildId,
+    category: 'moderation',
+    eventType: action,
+    actorId: moderatorId,
+    targetId: userId,
+    summary: `${caseId}: ${action} aplicado`,
+    details: { reason, duration, status }
+  });
+  return modCase;
+}
+
+function addEventLog({ guildId, category, eventType, actorId = null, targetId = null, channelId = null, summary, details = {} }) {
+  if (!tableExists('event_logs')) return null;
+  const result = db.prepare(`
+    INSERT INTO event_logs (guild_id, category, event_type, actor_id, target_id, channel_id, summary, details)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(guildId, category, eventType, actorId, targetId, channelId, summary, JSON.stringify(details || {}));
+  return getOne('SELECT * FROM event_logs WHERE id = ?', result.lastInsertRowid);
 }
 
 function getTickets() {
@@ -227,9 +305,110 @@ function getTickets() {
       staff_roles: safeJSON(config.staff_roles, []),
       categories: safeJSON(config.categories, [])
     } : null,
-    open: tableExists('tickets') ? getAll("SELECT * FROM tickets WHERE guild_id = ? AND status = 'open' ORDER BY created_at DESC LIMIT 30", guildId) : [],
+    open: tableExists('tickets') ? getAll("SELECT * FROM tickets WHERE guild_id = ? AND status IN ('open', 'pending') ORDER BY created_at DESC LIMIT 30", guildId) : [],
     recent: tableExists('tickets') ? getAll('SELECT * FROM tickets WHERE guild_id = ? ORDER BY created_at DESC LIMIT 50', guildId) : []
   };
+}
+
+function getOperationalLogs() {
+  const guildId = process.env.GUILD_ID;
+  const groups = {
+    cadastro: [],
+    moderacao: [],
+    tickets: [],
+    mensagens: [],
+    cargos: [],
+    canais: [],
+    automod: [],
+    economia: []
+  };
+
+  if (tableExists('event_logs')) {
+    const rows = getAll('SELECT * FROM event_logs WHERE guild_id = ? ORDER BY id DESC LIMIT 250', guildId)
+      .map(row => ({ ...row, details: safeJSON(row.details, {}) }));
+
+    for (const row of rows) {
+      groups[normalizeLogCategory(row.category)].push(row);
+    }
+  }
+
+  if (tableExists('users')) {
+    groups.cadastro.push(...getAll(`
+      SELECT
+        'cadastro' as category,
+        'user_seen' as event_type,
+        id as target_id,
+        username as summary,
+        created_at
+      FROM users
+      WHERE guild_id = ?
+      ORDER BY created_at DESC
+      LIMIT 30
+    `, guildId).map(row => ({ ...row, summary: `Usuario registrado no banco: ${row.summary || row.target_id}` })));
+  }
+
+  if (!groups.moderacao.length && tableExists('moderation')) {
+    groups.moderacao.push(...getAll(`
+      SELECT
+        'moderation' as category,
+        action as event_type,
+        moderator_id as actor_id,
+        user_id as target_id,
+        case_id || ': ' || action || ' - ' || COALESCE(reason, 'sem motivo') as summary,
+        created_at
+      FROM moderation
+      WHERE guild_id = ?
+      ORDER BY COALESCE(case_number, id) DESC
+      LIMIT 50
+    `, guildId));
+  }
+
+  if (!groups.tickets.length && tableExists('tickets')) {
+    groups.tickets.push(...getAll(`
+      SELECT
+        'tickets' as category,
+        status as event_type,
+        user_id as target_id,
+        channel_id,
+        'Ticket #' || id || ' - ' || category || ' - ' || status as summary,
+        created_at
+      FROM tickets
+      WHERE guild_id = ?
+      ORDER BY id DESC
+      LIMIT 50
+    `, guildId));
+  }
+
+  if (tableExists('inventory')) {
+    groups.economia.push(...getAll(`
+      SELECT
+        'economia' as category,
+        'purchase' as event_type,
+        user_id as actor_id,
+        item_key as target_id,
+        'Compra de item: ' || item_key || ' x' || quantity as summary,
+        purchased_at as created_at
+      FROM inventory
+      WHERE guild_id = ?
+      ORDER BY purchased_at DESC
+      LIMIT 50
+    `, guildId));
+  }
+
+  return groups;
+}
+
+function normalizeLogCategory(category) {
+  const text = String(category || '').toLowerCase();
+  if (text.includes('ticket')) return 'tickets';
+  if (text.includes('moderation') || text.includes('moderacao')) return 'moderacao';
+  if (text.includes('message') || text.includes('mensagem')) return 'mensagens';
+  if (text.includes('role') || text.includes('cargo')) return 'cargos';
+  if (text.includes('channel') || text.includes('canal')) return 'canais';
+  if (text.includes('automod')) return 'automod';
+  if (text.includes('econom')) return 'economia';
+  if (text.includes('cadastro') || text.includes('member') || text.includes('user')) return 'cadastro';
+  return 'mensagens';
 }
 
 function requireDiscordEnv() {
@@ -280,9 +459,8 @@ async function applyModerationAction({ action, userId, reason, durationMinutes }
   if (action === 'warn') {
     db.prepare('INSERT OR IGNORE INTO users (id, guild_id, username) VALUES (?, ?, ?)').run(userId, guildId, '');
     db.prepare('UPDATE users SET warnings = warnings + 1 WHERE id = ? AND guild_id = ?').run(userId, guildId);
-    db.prepare('INSERT INTO moderation (guild_id, user_id, moderator_id, action, reason, duration) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(guildId, userId, 'dashboard', 'warn', cleanReason, null);
-    return { action, userId, message: 'Warning registrado no banco.' };
+    const modCase = addModerationCase({ guildId, userId, moderatorId: 'dashboard', action: 'warn', reason: cleanReason });
+    return { action, userId, caseId: modCase.case_id, message: `Warning registrado (${modCase.case_id}).` };
   }
 
   if (action === 'ban') {
@@ -290,16 +468,14 @@ async function applyModerationAction({ action, userId, reason, durationMinutes }
       body: { delete_message_seconds: 0 },
       reason: cleanReason
     });
-    db.prepare('INSERT INTO moderation (guild_id, user_id, moderator_id, action, reason, duration) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(guildId, userId, 'dashboard', 'ban', cleanReason, null);
-    return { action, userId, message: 'Usuario banido.' };
+    const modCase = addModerationCase({ guildId, userId, moderatorId: 'dashboard', action: 'ban', reason: cleanReason });
+    return { action, userId, caseId: modCase.case_id, message: `Usuario banido (${modCase.case_id}).` };
   }
 
   if (action === 'kick') {
     await rest.delete(Routes.guildMember(guildId, userId), { reason: cleanReason });
-    db.prepare('INSERT INTO moderation (guild_id, user_id, moderator_id, action, reason, duration) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(guildId, userId, 'dashboard', 'kick', cleanReason, null);
-    return { action, userId, message: 'Usuario expulso.' };
+    const modCase = addModerationCase({ guildId, userId, moderatorId: 'dashboard', action: 'kick', reason: cleanReason });
+    return { action, userId, caseId: modCase.case_id, message: `Usuario expulso (${modCase.case_id}).` };
   }
 
   if (action === 'timeout') {
@@ -309,9 +485,8 @@ async function applyModerationAction({ action, userId, reason, durationMinutes }
       body: { communication_disabled_until: until },
       reason: cleanReason
     });
-    db.prepare('INSERT INTO moderation (guild_id, user_id, moderator_id, action, reason, duration) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(guildId, userId, 'dashboard', 'timeout', cleanReason, minutes * 60000);
-    return { action, userId, message: `Timeout aplicado por ${minutes} minuto(s).` };
+    const modCase = addModerationCase({ guildId, userId, moderatorId: 'dashboard', action: 'timeout', reason: cleanReason, duration: minutes * 60000 });
+    return { action, userId, caseId: modCase.case_id, message: `Timeout aplicado por ${minutes} minuto(s) (${modCase.case_id}).` };
   }
 
   if (action === 'untimeout') {
@@ -319,9 +494,8 @@ async function applyModerationAction({ action, userId, reason, durationMinutes }
       body: { communication_disabled_until: null },
       reason: cleanReason
     });
-    db.prepare('INSERT INTO moderation (guild_id, user_id, moderator_id, action, reason, duration) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(guildId, userId, 'dashboard', 'untimeout', cleanReason, null);
-    return { action, userId, message: 'Timeout removido.' };
+    const modCase = addModerationCase({ guildId, userId, moderatorId: 'dashboard', action: 'untimeout', reason: cleanReason });
+    return { action, userId, caseId: modCase.case_id, message: `Timeout removido (${modCase.case_id}).` };
   }
 
   const error = new Error('Acao de moderacao invalida.');
@@ -421,6 +595,10 @@ app.get('/api/shop', (req, res) => {
   res.json(getShop());
 });
 
+app.get('/api/automod', (req, res) => {
+  res.json(getAutomodConfig());
+});
+
 app.get('/api/admin/options', (req, res) => {
   res.json(getAdminOptions());
 });
@@ -450,8 +628,12 @@ app.post('/api/admin/badges', asyncRoute(async (req) => {
   return awardBadge(requireUserId(req.body.userId), String(req.body.badgeKey || '').trim());
 }));
 
+app.post('/api/admin/automod', asyncRoute(async (req) => {
+  return saveAutomodRule(String(req.body.ruleName || ''), req.body);
+}));
+
 app.get('/api/logs', (req, res) => {
-  res.json(getModeration().recent);
+  res.json(getOperationalLogs());
 });
 
 app.get('*', (req, res) => {

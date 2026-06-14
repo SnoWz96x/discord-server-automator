@@ -17,5 +17,10 @@ module.exports = {
     if (levelingModule) {
       await levelingModule.addXP(message.author.id, message.guild.id, client);
     }
+
+    client.db.incrementMessageCount(message.author.id, message.guild.id, 1);
+
+    const quests = client.modules.get('quests');
+    if (quests) quests.record(client, message.guild.id, message.author.id, 'message', 1);
   }
 };

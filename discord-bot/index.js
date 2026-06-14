@@ -106,6 +106,9 @@ client.on('interactionCreate', async (interaction) => {
       } else if (action === 'role') {
         const reactionModule = client.modules.get('reactionroles');
         if (reactionModule) await reactionModule.handleButton(interaction, client, params);
+      } else if (action === 'forum') {
+        const forumModule = client.modules.get('forumTemplates');
+        if (forumModule) await forumModule.handleButton(interaction, client);
       }
       return;
     }
@@ -127,6 +130,9 @@ client.on('interactionCreate', async (interaction) => {
       if (interaction.customId.startsWith('ticket_intake_')) {
         const ticketModule = client.modules.get('tickets');
         if (ticketModule) await ticketModule.handleModalSubmit(interaction, client);
+      } else if (interaction.customId === 'ticket_note_modal') {
+        const ticketModule = client.modules.get('tickets');
+        if (ticketModule) await ticketModule.handleTicketNoteModal(interaction, client);
       }
     }
   } catch (error) {

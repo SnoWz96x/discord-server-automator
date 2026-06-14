@@ -165,6 +165,7 @@ module.exports = {
       client.db.removeCoins(userId, guildId, item.price_coins);
       client.db.removeCp(userId, guildId, priceCp);
       client.db.addInventoryItem(guildId, userId, item.key, 1);
+      client.db.decrementShopStock(guildId, item.key, 1);
     });
     purchase();
 

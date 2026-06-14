@@ -57,7 +57,11 @@ module.exports = {
 
     client.db.updateUserXP(userId, guildId, xp);
     client.db.addCoins(userId, guildId, coins);
+    client.db.addVoiceMinutes(userId, guildId, rewardMinutes);
     if (cp > 0) client.db.addCp(userId, guildId, cp);
+
+    const quests = client.modules.get('quests');
+    if (quests) quests.record(client, guildId, userId, 'voice', rewardMinutes);
 
     const user = client.db.getUser(userId, guildId);
     const newLevel = Math.floor(0.1 * Math.sqrt(user.xp));

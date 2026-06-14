@@ -521,11 +521,63 @@ td {
   gap: 12px;
 }
 
+.log-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.log-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  padding: 12px;
+  min-height: 180px;
+}
+
+.log-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.log-list {
+  display: grid;
+  gap: 8px;
+}
+
+.log-row {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  display: grid;
+  gap: 5px;
+}
+
+.log-row strong {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.log-row small {
+  color: var(--muted);
+}
+
 .admin-grid {
   margin-top: 14px;
   display: grid;
   grid-template-columns: minmax(280px, 1.25fr) repeat(3, minmax(220px, 1fr));
   gap: 12px;
+}
+
+.automod-grid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(120px, 1fr)) auto;
+  gap: 12px;
+  align-items: end;
 }
 
 .admin-card {
@@ -574,7 +626,9 @@ td {
   }
 
   .module-grid,
-  .admin-grid {
+  .log-grid,
+  .admin-grid,
+  .automod-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -599,7 +653,9 @@ td {
 
   .mini-grid,
   .module-grid,
-  .admin-grid {
+  .log-grid,
+  .admin-grid,
+  .automod-grid {
     grid-template-columns: 1fr;
   }
 }

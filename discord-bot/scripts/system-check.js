@@ -12,10 +12,16 @@ const requiredCommands = [
   'capture',
   'creatures',
   'inventory',
+  'profile',
+  'quests',
   'shop',
   'rank',
   'leaderboard',
   'warn',
+  'case',
+  'cases',
+  'reason',
+  'modhistory',
   'ban',
   'kick'
 ];

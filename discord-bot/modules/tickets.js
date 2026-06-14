@@ -65,6 +65,9 @@ module.exports = {
     if (action === 'close') return this.closeTicket(interaction, client);
     if (action === 'claim') return this.claimTicket(interaction, client);
     if (action === 'transcript') return this.exportTranscript(interaction, client);
+    if (action === 'reopen') return this.reopenTicket(interaction, client);
+    if (action === 'delete') return this.deleteTicket(interaction, client);
+    if (action === 'note') return this.showNoteModal(interaction, client);
   },
 
   async handleSelectMenu(interaction, client) {
@@ -111,10 +114,19 @@ module.exports = {
       .setMaxLength(900)
       .setPlaceholder('Cole IDs, links ou passos para reproduzir. Prints podem ser enviados depois no ticket.');
 
+    const priority = new TextInputBuilder()
+      .setCustomId('priority')
+      .setLabel('Prioridade: baixa, normal, alta ou urgente')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(false)
+      .setMaxLength(20)
+      .setPlaceholder('normal');
+
     modal.addComponents(
       new ActionRowBuilder().addComponents(summary),
       new ActionRowBuilder().addComponents(when),
-      new ActionRowBuilder().addComponents(evidence)
+      new ActionRowBuilder().addComponents(evidence),
+      new ActionRowBuilder().addComponents(priority)
     );
 
     return interaction.showModal(modal);
@@ -133,7 +145,8 @@ module.exports = {
     return this.createTicket(interaction, client, category, {
       summary: interaction.fields.getTextInputValue('summary'),
       when: interaction.fields.getTextInputValue('when') || 'Nao informado',
-      evidence: interaction.fields.getTextInputValue('evidence') || 'Nao informado'
+      evidence: interaction.fields.getTextInputValue('evidence') || 'Nao informado',
+      priority: normalizePriority(interaction.fields.getTextInputValue('priority'))
     });
   },
 
@@ -189,7 +202,11 @@ module.exports = {
         permissionOverwrites
       });
 
-      client.db.createTicket(interaction.guild.id, ticketChannel.id, interaction.user.id, category);
+      const ticket = client.db.createTicket(interaction.guild.id, ticketChannel.id, interaction.user.id, category, {
+        priority: intake?.priority || 'normal',
+        subject: intake?.summary?.slice(0, 120) || category,
+        intake
+      });
 
       const categoryConfig = config.categories.find(c => c.name === category);
       const color = categoryConfig?.color || 0xFF6B35;
@@ -200,6 +217,8 @@ module.exports = {
         .setTitle(`${emoji} Ticket - ${category}`)
         .setDescription([
           `Ola ${interaction.user}.`,
+          `Ticket interno: **#${ticket.id}**`,
+          `Prioridade: **${priorityLabel(ticket.priority)}**`,
           '',
           '**Resumo inicial:**',
           intake?.summary || 'Nao informado',
@@ -227,7 +246,12 @@ module.exports = {
         .setLabel('Transcript')
         .setStyle(ButtonStyle.Secondary);
 
-      const row = new ActionRowBuilder().addComponents(closeBtn, claimBtn, transcriptBtn);
+      const noteBtn = new ButtonBuilder()
+        .setCustomId('ticket_note')
+        .setLabel('Nota Staff')
+        .setStyle(ButtonStyle.Secondary);
+
+      const row = new ActionRowBuilder().addComponents(claimBtn, transcriptBtn, noteBtn, closeBtn);
 
       await ticketChannel.send({ embeds: [embed], components: [row] });
       await interaction.editReply({ content: `Ticket criado em ${ticketChannel}` });
@@ -259,21 +283,37 @@ module.exports = {
       return interaction.reply({ content: 'Este nao e um canal de ticket.', ephemeral: true });
     }
 
+    if (ticket.status === 'closed') {
+      return interaction.reply({ content: 'Este ticket ja esta fechado.', ephemeral: true });
+    }
+
     await interaction.deferReply();
     await this.exportTranscript(interaction, client, { silent: true });
-    client.db.closeTicket(interaction.channel.id);
+    client.db.closeTicket(interaction.channel.id, interaction.user.id, 'Fechado pela staff');
+
+    await interaction.channel.permissionOverwrites.edit(ticket.user_id, {
+      SendMessages: false,
+      CreatePublicThreads: false,
+      SendMessagesInThreads: false
+    }).catch(() => {});
 
     const embed = new EmbedBuilder()
       .setColor('#FF0000')
       .setTitle('Ticket Fechado')
-      .setDescription(`Ticket fechado por ${interaction.user}\n\nEste canal sera deletado em 10 segundos.`)
+      .setDescription(`Ticket fechado por ${interaction.user}.\n\nO canal foi bloqueado para o usuario. Use **Reabrir** para devolver acesso ou **Apagar** para remover o canal.`)
       .setTimestamp();
 
-    await interaction.editReply({ embeds: [embed] });
+    const reopenBtn = new ButtonBuilder()
+      .setCustomId('ticket_reopen')
+      .setLabel('Reabrir')
+      .setStyle(ButtonStyle.Success);
 
-    setTimeout(async () => {
-      await interaction.channel.delete().catch(error => console.error('Error deleting ticket channel:', error));
-    }, 10000);
+    const deleteBtn = new ButtonBuilder()
+      .setCustomId('ticket_delete')
+      .setLabel('Apagar')
+      .setStyle(ButtonStyle.Danger);
+
+    await interaction.editReply({ embeds: [embed], components: [new ActionRowBuilder().addComponents(reopenBtn, deleteBtn)] });
   },
 
   async claimTicket(interaction, client) {
@@ -282,6 +322,8 @@ module.exports = {
       return interaction.reply({ content: 'Este nao e um canal de ticket.', ephemeral: true });
     }
 
+    client.db.claimTicket(interaction.channel.id, interaction.user.id);
+
     const embed = new EmbedBuilder()
       .setColor('#00FF00')
       .setTitle('Ticket Atendido')
@@ -289,6 +331,60 @@ module.exports = {
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
+  },
+
+  async reopenTicket(interaction, client) {
+    const ticket = client.db.getTicket(interaction.channel.id);
+    if (!ticket) return interaction.reply({ content: 'Este nao e um canal de ticket.', ephemeral: true });
+
+    client.db.reopenTicket(interaction.channel.id);
+    await interaction.channel.permissionOverwrites.edit(ticket.user_id, {
+      ViewChannel: true,
+      SendMessages: true,
+      ReadMessageHistory: true
+    }).catch(() => {});
+
+    const embed = new EmbedBuilder()
+      .setColor('#57F287')
+      .setTitle('Ticket Reaberto')
+      .setDescription(`Ticket reaberto por ${interaction.user}.`)
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed] });
+  },
+
+  async deleteTicket(interaction, client) {
+    const ticket = client.db.getTicket(interaction.channel.id);
+    if (!ticket) return interaction.reply({ content: 'Este nao e um canal de ticket.', ephemeral: true });
+
+    await interaction.reply({ content: 'Apagando ticket em 5 segundos...', ephemeral: true });
+    setTimeout(async () => {
+      await interaction.channel.delete('Ticket deleted by staff').catch(error => console.error('Error deleting ticket channel:', error));
+    }, 5000);
+  },
+
+  async showNoteModal(interaction) {
+    const modal = new ModalBuilder()
+      .setCustomId('ticket_note_modal')
+      .setTitle('Nota interna do ticket');
+
+    const note = new TextInputBuilder()
+      .setCustomId('note')
+      .setLabel('Nota visivel apenas para staff/logs')
+      .setStyle(TextInputStyle.Paragraph)
+      .setRequired(true)
+      .setMaxLength(1000);
+
+    modal.addComponents(new ActionRowBuilder().addComponents(note));
+    return interaction.showModal(modal);
+  },
+
+  async handleTicketNoteModal(interaction, client) {
+    const note = interaction.fields.getTextInputValue('note');
+    const saved = client.db.addTicketNote(interaction.guild.id, interaction.channel.id, interaction.user.id, note);
+    if (!saved) return interaction.reply({ content: 'Este nao e um canal de ticket.', ephemeral: true });
+
+    await interaction.reply({ content: `Nota interna adicionada (#${saved.id}).`, ephemeral: true });
   },
 
   async exportTranscript(interaction, client, options = {}) {
@@ -307,6 +403,9 @@ module.exports = {
       ``,
       `Ticket: ${interaction.channel.name}`,
       `Categoria: ${ticket.category}`,
+      `Status: ${ticket.status}`,
+      `Prioridade: ${ticket.priority || 'normal'}`,
+      `Atendente: ${ticket.claimed_by || 'nao atribuido'}`,
       `Usuario: ${ticket.user_id}`,
       `Canal: ${interaction.channel.name} (${interaction.channel.id})`,
       `Gerado em: ${new Date().toISOString()}`,
@@ -324,16 +423,27 @@ module.exports = {
       lines.push(`[${message.createdAt.toISOString()}] ${author}: ${content}${attachments}`);
     }
 
+    const notes = client.db.getTicketNotes(interaction.channel.id);
+    if (notes.length) {
+      lines.push('', '---', '', '## Notas internas', '');
+      for (const note of notes) {
+        lines.push(`[${note.created_at}] ${note.author_id}: ${note.note}`);
+      }
+    }
+
     const buffer = Buffer.from(lines.join('\n'), 'utf8');
     const attachment = new AttachmentBuilder(buffer, {
       name: `transcript-${interaction.channel.id}.md`
+    });
+    const htmlAttachment = new AttachmentBuilder(this.buildHtmlTranscript(interaction, ticket, ordered, notes), {
+      name: `transcript-${interaction.channel.id}.html`
     });
 
     const transcriptChannel = interaction.guild.channels.cache.find(channel => channel.name.endsWith('-ticket-transcripts'));
     if (transcriptChannel) {
       await transcriptChannel.send({
         content: `Transcript de #${interaction.channel.name} (${interaction.channel.id}) | usuario <@${ticket.user_id}> | categoria ${ticket.category}`,
-        files: [attachment]
+        files: [attachment, htmlAttachment]
       });
     }
 
@@ -342,5 +452,78 @@ module.exports = {
     }
 
     return buffer;
+  },
+
+  buildHtmlTranscript(interaction, ticket, messages, notes) {
+    const rows = messages.map(message => {
+      const author = escapeHtml(message.author?.tag || message.author?.username || 'Unknown');
+      const content = escapeHtml(message.content || '[sem texto]');
+      const time = escapeHtml(message.createdAt.toISOString());
+      const attachments = message.attachments.size
+        ? `<div class="attachments">${message.attachments.map(attachment => `<a href="${escapeHtml(attachment.url)}">${escapeHtml(attachment.name || attachment.url)}</a>`).join(' ')}</div>`
+        : '';
+      return `<article><time>${time}</time><strong>${author}</strong><p>${content}</p>${attachments}</article>`;
+    }).join('');
+
+    const noteRows = notes.map(note => `<li><strong>${escapeHtml(note.author_id)}</strong>: ${escapeHtml(note.note)} <small>${escapeHtml(note.created_at)}</small></li>`).join('');
+
+    return Buffer.from(`<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Transcript ${escapeHtml(interaction.channel.name)}</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #111318; color: #f4f6fb; margin: 0; padding: 32px; }
+    header { border-bottom: 1px solid #2f3440; margin-bottom: 24px; padding-bottom: 16px; }
+    h1 { margin: 0 0 8px; }
+    .meta { color: #b5bdca; line-height: 1.6; }
+    article { background: #1b1f2a; border: 1px solid #2f3440; border-radius: 8px; padding: 14px; margin: 12px 0; }
+    time { display: block; color: #8c95a6; font-size: 12px; margin-bottom: 6px; }
+    p { white-space: pre-wrap; }
+    a { color: #8ab4ff; }
+    li { margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Transcript ${escapeHtml(interaction.channel.name)}</h1>
+    <div class="meta">
+      Categoria: ${escapeHtml(ticket.category)}<br>
+      Status: ${escapeHtml(ticket.status)}<br>
+      Prioridade: ${escapeHtml(ticket.priority || 'normal')}<br>
+      Usuario: ${escapeHtml(ticket.user_id)}
+    </div>
+  </header>
+  <main>${rows}</main>
+  <section>
+    <h2>Notas internas</h2>
+    <ul>${noteRows || '<li>Nenhuma nota interna.</li>'}</ul>
+  </section>
+</body>
+</html>`, 'utf8');
   }
 };
+
+function normalizePriority(value) {
+  const normalized = String(value || 'normal').trim().toLowerCase();
+  return ['baixa', 'normal', 'alta', 'urgente'].includes(normalized) ? normalized : 'normal';
+}
+
+function priorityLabel(priority) {
+  const labels = {
+    baixa: 'Baixa',
+    normal: 'Normal',
+    alta: 'Alta',
+    urgente: 'Urgente'
+  };
+  return labels[priority] || labels.normal;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}

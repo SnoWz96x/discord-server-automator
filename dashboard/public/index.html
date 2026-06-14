@@ -24,6 +24,8 @@
         <a href="#shop">Loja</a>
         <a href="#moderation">Moderacao</a>
         <a href="#tickets">Tickets</a>
+        <a href="#logs">Logs</a>
+        <a href="#automod">AutoMod</a>
         <a href="#modules">Modulos</a>
       </nav>
 
@@ -283,6 +285,16 @@
         </article>
       </section>
 
+      <section id="logs" class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Auditoria</p>
+            <h2>Logs por evento</h2>
+          </div>
+        </div>
+        <div id="logGroups" class="log-grid"></div>
+      </section>
+
       <section id="tickets" class="two-column">
         <article class="panel">
           <div class="panel-head">
@@ -303,6 +315,52 @@
           </div>
           <div id="ticketCategories" class="chips"></div>
         </article>
+      </section>
+
+      <section id="automod" class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Protecao</p>
+            <h2>AutoMod</h2>
+          </div>
+        </div>
+        <form id="automodForm" class="automod-grid">
+          <label>
+            <span>Regra</span>
+            <select name="ruleName">
+              <option value="antiSpam">Anti spam</option>
+              <option value="antiCaps">Anti caps</option>
+              <option value="antiInvite">Anti invite</option>
+              <option value="antiLink">Anti link</option>
+              <option value="bannedWords">Palavras bloqueadas</option>
+            </select>
+          </label>
+          <label>
+            <span>Ativa</span>
+            <select name="enabled">
+              <option value="true">Sim</option>
+              <option value="false">Nao</option>
+            </select>
+          </label>
+          <label>
+            <span>Campo 1</span>
+            <input name="fieldA" placeholder="maxMessages, threshold ou whitelist" />
+          </label>
+          <label>
+            <span>Valor 1</span>
+            <input name="valueA" placeholder="5 ou roguepoke.com,youtube.com" />
+          </label>
+          <label>
+            <span>Campo 2</span>
+            <input name="fieldB" placeholder="timeWindow, minLength ou words" />
+          </label>
+          <label>
+            <span>Valor 2</span>
+            <input name="valueB" placeholder="10000 ou palavra1,palavra2" />
+          </label>
+          <button type="submit">Salvar AutoMod</button>
+        </form>
+        <div id="automodList" class="module-grid"></div>
       </section>
 
       <section id="modules" class="panel">

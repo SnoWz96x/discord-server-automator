@@ -3,7 +3,7 @@ const path = require('path');
 
 class RoguePokeDB {
   constructor() {
-    this.db = new Database(path.join(__dirname, '../../roguepoke.db'));
+    this.db = new Database(process.env.DATABASE_PATH || path.join(__dirname, '../../roguepoke.db'));
     this.db.pragma('journal_mode = WAL');
     this.initTables();
   }
@@ -30,6 +30,9 @@ class RoguePokeDB {
         last_work DATETIME,
         warnings INTEGER DEFAULT 0,
         verified INTEGER DEFAULT 0,
+        message_count INTEGER DEFAULT 0,
+        voice_minutes INTEGER DEFAULT 0,
+        daily_streak INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (id, guild_id),
         FOREIGN KEY (guild_id) REFERENCES guilds(id)
@@ -62,19 +65,41 @@ class RoguePokeDB {
         channel_id TEXT,
         user_id TEXT,
         category TEXT,
+        priority TEXT DEFAULT 'normal',
         status TEXT DEFAULT 'open',
+        claimed_by TEXT,
+        subject TEXT,
+        intake TEXT DEFAULT '{}',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        closed_at DATETIME
+        closed_at DATETIME,
+        closed_by TEXT,
+        close_reason TEXT,
+        reopened_at DATETIME
+      );
+
+      CREATE TABLE IF NOT EXISTS ticket_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id TEXT NOT NULL,
+        ticket_id INTEGER NOT NULL,
+        channel_id TEXT NOT NULL,
+        author_id TEXT NOT NULL,
+        note TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (ticket_id) REFERENCES tickets(id)
       );
 
       CREATE TABLE IF NOT EXISTS moderation (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         guild_id TEXT,
+        case_number INTEGER,
+        case_id TEXT,
         user_id TEXT,
         moderator_id TEXT,
         action TEXT,
         reason TEXT,
         duration INTEGER,
+        status TEXT DEFAULT 'open',
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -118,10 +143,13 @@ class RoguePokeDB {
         guild_id TEXT NOT NULL,
         name TEXT NOT NULL,
         description TEXT DEFAULT '',
+        category TEXT DEFAULT 'general',
         type TEXT NOT NULL,
         price_coins INTEGER DEFAULT 0,
         price_cp INTEGER DEFAULT 0,
         min_level INTEGER DEFAULT 0,
+        stock INTEGER,
+        available_until DATETIME,
         payload TEXT DEFAULT '{}',
         enabled INTEGER DEFAULT 1
       );
@@ -213,6 +241,32 @@ class RoguePokeDB {
         channel_id TEXT,
         category_id TEXT
       );
+
+      CREATE TABLE IF NOT EXISTS quest_progress (
+        guild_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        quest_key TEXT NOT NULL,
+        period_key TEXT NOT NULL,
+        progress INTEGER DEFAULT 0,
+        completed INTEGER DEFAULT 0,
+        claimed INTEGER DEFAULT 0,
+        completed_at DATETIME,
+        claimed_at DATETIME,
+        PRIMARY KEY (guild_id, user_id, quest_key, period_key)
+      );
+
+      CREATE TABLE IF NOT EXISTS event_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id TEXT NOT NULL,
+        category TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        actor_id TEXT,
+        target_id TEXT,
+        channel_id TEXT,
+        summary TEXT NOT NULL,
+        details TEXT DEFAULT '{}',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     const levelRewardColumns = this.db.prepare('PRAGMA table_info(level_rewards)').all().map(column => column.name);
@@ -221,7 +275,26 @@ class RoguePokeDB {
     }
 
     this.ensureColumn('users', 'cp', 'INTEGER DEFAULT 0');
+    this.ensureColumn('users', 'message_count', 'INTEGER DEFAULT 0');
+    this.ensureColumn('users', 'voice_minutes', 'INTEGER DEFAULT 0');
+    this.ensureColumn('users', 'daily_streak', 'INTEGER DEFAULT 0');
     this.ensureColumn('shop_items', 'price_cp', 'INTEGER DEFAULT 0');
+    this.ensureColumn('shop_items', 'category', "TEXT DEFAULT 'general'");
+    this.ensureColumn('shop_items', 'stock', 'INTEGER');
+    this.ensureColumn('shop_items', 'available_until', 'DATETIME');
+    this.ensureColumn('moderation', 'case_number', 'INTEGER');
+    this.ensureColumn('moderation', 'case_id', 'TEXT');
+    this.ensureColumn('moderation', 'status', "TEXT DEFAULT 'open'");
+    this.ensureColumn('moderation', 'updated_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP');
+    this.ensureColumn('tickets', 'priority', "TEXT DEFAULT 'normal'");
+    this.ensureColumn('tickets', 'claimed_by', 'TEXT');
+    this.ensureColumn('tickets', 'subject', 'TEXT');
+    this.ensureColumn('tickets', 'intake', "TEXT DEFAULT '{}'");
+    this.ensureColumn('tickets', 'closed_by', 'TEXT');
+    this.ensureColumn('tickets', 'close_reason', 'TEXT');
+    this.ensureColumn('tickets', 'reopened_at', 'DATETIME');
+
+    this.backfillModerationCases();
 
     this.migrateUsersCompositeKey();
   }
@@ -254,21 +327,46 @@ class RoguePokeDB {
         last_work DATETIME,
         warnings INTEGER DEFAULT 0,
         verified INTEGER DEFAULT 0,
+        message_count INTEGER DEFAULT 0,
+        voice_minutes INTEGER DEFAULT 0,
+        daily_streak INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (id, guild_id),
         FOREIGN KEY (guild_id) REFERENCES guilds(id)
       );
 
       INSERT OR IGNORE INTO users_new (
-        id, guild_id, username, xp, level, coins, cp, last_daily, last_weekly, last_work, warnings, verified, created_at
+        id, guild_id, username, xp, level, coins, cp, last_daily, last_weekly, last_work, warnings, verified, message_count, voice_minutes, daily_streak, created_at
       )
-      SELECT id, guild_id, username, xp, level, coins, COALESCE(cp, 0), last_daily, last_weekly, last_work, warnings, verified, created_at
+      SELECT id, guild_id, username, xp, level, coins, COALESCE(cp, 0), last_daily, last_weekly, last_work, warnings, verified, COALESCE(message_count, 0), COALESCE(voice_minutes, 0), COALESCE(daily_streak, 0), created_at
       FROM users
       WHERE id IS NOT NULL AND guild_id IS NOT NULL;
 
       DROP TABLE users;
       ALTER TABLE users_new RENAME TO users;
     `);
+  }
+
+  backfillModerationCases() {
+    const rows = this.db.prepare(`
+      SELECT id, guild_id
+      FROM moderation
+      WHERE case_number IS NULL OR case_id IS NULL
+      ORDER BY guild_id ASC, id ASC
+    `).all();
+
+    const nextByGuild = new Map();
+    for (const row of rows) {
+      if (!nextByGuild.has(row.guild_id)) {
+        const current = this.db.prepare('SELECT COALESCE(MAX(case_number), 0) as max FROM moderation WHERE guild_id = ?').get(row.guild_id);
+        nextByGuild.set(row.guild_id, Number(current?.max || 0));
+      }
+
+      const next = nextByGuild.get(row.guild_id) + 1;
+      nextByGuild.set(row.guild_id, next);
+      this.db.prepare('UPDATE moderation SET case_number = ?, case_id = ? WHERE id = ?')
+        .run(next, this.formatCaseId(next), row.id);
+    }
   }
 
   connect() {
@@ -341,6 +439,30 @@ class RoguePokeDB {
     return stmt.run(amount, userId, guildId);
   }
 
+  incrementMessageCount(userId, guildId, amount = 1) {
+    const stmt = this.db.prepare('UPDATE users SET message_count = message_count + ? WHERE id = ? AND guild_id = ?');
+    return stmt.run(amount, userId, guildId);
+  }
+
+  addVoiceMinutes(userId, guildId, minutes) {
+    const stmt = this.db.prepare('UPDATE users SET voice_minutes = voice_minutes + ? WHERE id = ? AND guild_id = ?');
+    return stmt.run(Math.max(0, minutes), userId, guildId);
+  }
+
+  getUserRank(guildId, userId, column = 'xp') {
+    const safeColumn = ['xp', 'coins', 'cp', 'voice_minutes', 'message_count'].includes(column) ? column : 'xp';
+    const user = this.getUser(userId, guildId);
+    if (!user) return null;
+
+    const row = this.db.prepare(`
+      SELECT COUNT(*) + 1 as rank
+      FROM users
+      WHERE guild_id = ? AND ${safeColumn} > ?
+    `).get(guildId, user[safeColumn] || 0);
+
+    return row?.rank || 1;
+  }
+
   setCoins(userId, guildId, amount) {
     const stmt = this.db.prepare('UPDATE users SET coins = ? WHERE id = ? AND guild_id = ?');
     return stmt.run(Math.max(0, amount), userId, guildId);
@@ -383,27 +505,233 @@ class RoguePokeDB {
     return stmt.run(guildId, messageId, roleId);
   }
 
-  createTicket(guildId, channelId, userId, category) {
-    const stmt = this.db.prepare('INSERT INTO tickets (guild_id, channel_id, user_id, category) VALUES (?, ?, ?, ?)');
-    return stmt.run(guildId, channelId, userId, category);
+  createTicket(guildId, channelId, userId, category, details = {}) {
+    const stmt = this.db.prepare(`
+      INSERT INTO tickets (guild_id, channel_id, user_id, category, priority, subject, intake)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    const result = stmt.run(
+      guildId,
+      channelId,
+      userId,
+      category,
+      details.priority || 'normal',
+      details.subject || null,
+      JSON.stringify(details.intake || {})
+    );
+    const ticket = this.db.prepare('SELECT * FROM tickets WHERE id = ?').get(result.lastInsertRowid);
+    this.addEventLog({
+      guildId,
+      category: 'tickets',
+      eventType: 'ticket_created',
+      actorId: userId,
+      targetId: userId,
+      channelId,
+      summary: `Ticket #${ticket.id} criado em ${category}`,
+      details: { ticketId: ticket.id, category, priority: ticket.priority, subject: ticket.subject }
+    });
+    return ticket;
   }
 
   getTicket(channelId) {
-    return this.db.prepare('SELECT * FROM tickets WHERE channel_id = ? AND status = ?').get(channelId, 'open');
+    const ticket = this.db.prepare("SELECT * FROM tickets WHERE channel_id = ? AND status IN ('open', 'pending', 'closed') ORDER BY id DESC LIMIT 1").get(channelId);
+    if (!ticket) return null;
+    return { ...ticket, intake: this.parseJSON(ticket.intake, {}) };
   }
 
-  closeTicket(channelId) {
-    const stmt = this.db.prepare('UPDATE tickets SET status = ?, closed_at = CURRENT_TIMESTAMP WHERE channel_id = ?');
-    return stmt.run('closed', channelId);
+  closeTicket(channelId, closedBy = null, reason = null) {
+    const ticket = this.getTicket(channelId);
+    const stmt = this.db.prepare("UPDATE tickets SET status = 'closed', closed_by = ?, close_reason = ?, closed_at = CURRENT_TIMESTAMP WHERE channel_id = ?");
+    const result = stmt.run(closedBy, reason, channelId);
+    if (ticket) {
+      this.addEventLog({
+        guildId: ticket.guild_id,
+        category: 'tickets',
+        eventType: 'ticket_closed',
+        actorId: closedBy,
+        targetId: ticket.user_id,
+        channelId,
+        summary: `Ticket #${ticket.id} fechado`,
+        details: { ticketId: ticket.id, reason }
+      });
+    }
+    return result;
+  }
+
+  reopenTicket(channelId) {
+    const ticket = this.getTicket(channelId);
+    const stmt = this.db.prepare("UPDATE tickets SET status = 'open', reopened_at = CURRENT_TIMESTAMP WHERE channel_id = ?");
+    const result = stmt.run(channelId);
+    if (ticket) {
+      this.addEventLog({
+        guildId: ticket.guild_id,
+        category: 'tickets',
+        eventType: 'ticket_reopened',
+        targetId: ticket.user_id,
+        channelId,
+        summary: `Ticket #${ticket.id} reaberto`,
+        details: { ticketId: ticket.id }
+      });
+    }
+    return result;
+  }
+
+  claimTicket(channelId, userId) {
+    const ticket = this.getTicket(channelId);
+    const stmt = this.db.prepare("UPDATE tickets SET claimed_by = ?, status = CASE WHEN status = 'closed' THEN status ELSE 'pending' END WHERE channel_id = ?");
+    const result = stmt.run(userId, channelId);
+    if (ticket) {
+      this.addEventLog({
+        guildId: ticket.guild_id,
+        category: 'tickets',
+        eventType: 'ticket_claimed',
+        actorId: userId,
+        targetId: ticket.user_id,
+        channelId,
+        summary: `Ticket #${ticket.id} assumido`,
+        details: { ticketId: ticket.id }
+      });
+    }
+    return result;
+  }
+
+  updateTicketStatus(channelId, status) {
+    const ticket = this.getTicket(channelId);
+    const stmt = this.db.prepare('UPDATE tickets SET status = ? WHERE channel_id = ?');
+    const result = stmt.run(status, channelId);
+    if (ticket) {
+      this.addEventLog({
+        guildId: ticket.guild_id,
+        category: 'tickets',
+        eventType: 'ticket_status_changed',
+        targetId: ticket.user_id,
+        channelId,
+        summary: `Ticket #${ticket.id} alterado para ${status}`,
+        details: { ticketId: ticket.id, status }
+      });
+    }
+    return result;
+  }
+
+  updateTicketPriority(channelId, priority) {
+    const ticket = this.getTicket(channelId);
+    const stmt = this.db.prepare('UPDATE tickets SET priority = ? WHERE channel_id = ?');
+    const result = stmt.run(priority, channelId);
+    if (ticket) {
+      this.addEventLog({
+        guildId: ticket.guild_id,
+        category: 'tickets',
+        eventType: 'ticket_priority_changed',
+        targetId: ticket.user_id,
+        channelId,
+        summary: `Ticket #${ticket.id} prioridade ${priority}`,
+        details: { ticketId: ticket.id, priority }
+      });
+    }
+    return result;
+  }
+
+  updateTicketCategory(channelId, category) {
+    const ticket = this.getTicket(channelId);
+    const stmt = this.db.prepare('UPDATE tickets SET category = ? WHERE channel_id = ?');
+    const result = stmt.run(category, channelId);
+    if (ticket) {
+      this.addEventLog({
+        guildId: ticket.guild_id,
+        category: 'tickets',
+        eventType: 'ticket_category_changed',
+        targetId: ticket.user_id,
+        channelId,
+        summary: `Ticket #${ticket.id} transferido para ${category}`,
+        details: { ticketId: ticket.id, category }
+      });
+    }
+    return result;
+  }
+
+  addTicketNote(guildId, channelId, authorId, note) {
+    const ticket = this.getTicket(channelId);
+    if (!ticket) return null;
+    const result = this.db.prepare(`
+      INSERT INTO ticket_notes (guild_id, ticket_id, channel_id, author_id, note)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(guildId, ticket.id, channelId, authorId, note);
+    const saved = this.db.prepare('SELECT * FROM ticket_notes WHERE id = ?').get(result.lastInsertRowid);
+    this.addEventLog({
+      guildId,
+      category: 'tickets',
+      eventType: 'ticket_note_added',
+      actorId: authorId,
+      targetId: ticket.user_id,
+      channelId,
+      summary: `Nota adicionada ao ticket #${ticket.id}`,
+      details: { ticketId: ticket.id }
+    });
+    return saved;
+  }
+
+  getTicketNotes(channelId) {
+    return this.db.prepare('SELECT * FROM ticket_notes WHERE channel_id = ? ORDER BY created_at ASC').all(channelId);
   }
 
   getUserTickets(guildId, userId) {
-    return this.db.prepare('SELECT * FROM tickets WHERE guild_id = ? AND user_id = ? AND status = ?').all(guildId, userId, 'open');
+    return this.db.prepare("SELECT * FROM tickets WHERE guild_id = ? AND user_id = ? AND status IN ('open', 'pending')").all(guildId, userId);
   }
 
-  addModAction(guildId, userId, moderatorId, action, reason, duration = null) {
-    const stmt = this.db.prepare('INSERT INTO moderation (guild_id, user_id, moderator_id, action, reason, duration) VALUES (?, ?, ?, ?, ?, ?)');
-    return stmt.run(guildId, userId, moderatorId, action, reason, duration);
+  formatCaseId(caseNumber) {
+    return `CASE-${String(caseNumber).padStart(5, '0')}`;
+  }
+
+  nextCaseNumber(guildId) {
+    const row = this.db.prepare('SELECT COALESCE(MAX(case_number), 0) + 1 as next FROM moderation WHERE guild_id = ?').get(guildId);
+    return Number(row?.next || 1);
+  }
+
+  addModAction(guildId, userId, moderatorId, action, reason, duration = null, status = 'open') {
+    const caseNumber = this.nextCaseNumber(guildId);
+    const caseId = this.formatCaseId(caseNumber);
+    const stmt = this.db.prepare(`
+      INSERT INTO moderation (guild_id, case_number, case_id, user_id, moderator_id, action, reason, duration, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    stmt.run(guildId, caseNumber, caseId, userId, moderatorId, action, reason, duration, status);
+    const modCase = this.getModCase(guildId, caseId);
+    this.addEventLog({
+      guildId,
+      category: 'moderation',
+      eventType: action,
+      actorId: moderatorId,
+      targetId: userId,
+      summary: `${caseId}: ${action} aplicado`,
+      details: { caseId, reason, duration, status }
+    });
+    return modCase;
+  }
+
+  addEventLog({ guildId, category, eventType, actorId = null, targetId = null, channelId = null, summary, details = {} }) {
+    if (!guildId || !category || !eventType || !summary) return null;
+    const result = this.db.prepare(`
+      INSERT INTO event_logs (guild_id, category, event_type, actor_id, target_id, channel_id, summary, details)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(guildId, category, eventType, actorId, targetId, channelId, summary, JSON.stringify(details || {}));
+    return this.db.prepare('SELECT * FROM event_logs WHERE id = ?').get(result.lastInsertRowid);
+  }
+
+  getEventLogs(guildId, category = null, limit = 100) {
+    const params = [guildId];
+    const filters = ['guild_id = ?'];
+    if (category) {
+      filters.push('category = ?');
+      params.push(category);
+    }
+    params.push(limit);
+
+    return this.db.prepare(`
+      SELECT * FROM event_logs
+      WHERE ${filters.join(' AND ')}
+      ORDER BY id DESC
+      LIMIT ?
+    `).all(...params).map(row => ({ ...row, details: this.parseJSON(row.details, {}) }));
   }
 
   getUserWarnings(guildId, userId) {
@@ -412,6 +740,55 @@ class RoguePokeDB {
 
   getModHistory(guildId, userId, limit = 10) {
     return this.db.prepare('SELECT * FROM moderation WHERE guild_id = ? AND user_id = ? ORDER BY created_at DESC LIMIT ?').all(guildId, userId, limit);
+  }
+
+  getModCase(guildId, caseIdOrNumber) {
+    const value = String(caseIdOrNumber || '').trim().toUpperCase();
+    const caseNumber = Number(value.replace(/^CASE-?/, ''));
+    if (Number.isFinite(caseNumber) && caseNumber > 0) {
+      return this.db.prepare('SELECT * FROM moderation WHERE guild_id = ? AND case_number = ?').get(guildId, caseNumber);
+    }
+    return this.db.prepare('SELECT * FROM moderation WHERE guild_id = ? AND UPPER(case_id) = ?').get(guildId, value);
+  }
+
+  getModCases(guildId, filters = {}) {
+    const clauses = ['guild_id = ?'];
+    const params = [guildId];
+
+    if (filters.userId) {
+      clauses.push('user_id = ?');
+      params.push(filters.userId);
+    }
+    if (filters.action) {
+      clauses.push('action = ?');
+      params.push(filters.action);
+    }
+    if (filters.status) {
+      clauses.push('status = ?');
+      params.push(filters.status);
+    }
+
+    const limit = Math.max(1, Math.min(Number(filters.limit || 10), 50));
+    params.push(limit);
+    return this.db.prepare(`
+      SELECT * FROM moderation
+      WHERE ${clauses.join(' AND ')}
+      ORDER BY case_number DESC
+      LIMIT ?
+    `).all(...params);
+  }
+
+  updateModCaseReason(guildId, caseIdOrNumber, moderatorId, reason) {
+    const modCase = this.getModCase(guildId, caseIdOrNumber);
+    if (!modCase) return null;
+
+    this.db.prepare(`
+      UPDATE moderation
+      SET reason = ?, moderator_id = COALESCE(?, moderator_id), updated_at = CURRENT_TIMESTAMP
+      WHERE guild_id = ? AND case_number = ?
+    `).run(reason, moderatorId, guildId, modCase.case_number);
+
+    return this.getModCase(guildId, modCase.case_number);
   }
 
   getWelcomeConfig(guildId) {
@@ -582,31 +959,45 @@ class RoguePokeDB {
 
   upsertShopItem(guildId, item) {
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO shop_items (key, guild_id, name, description, type, price_coins, price_cp, min_level, payload, enabled)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO shop_items (key, guild_id, name, description, category, type, price_coins, price_cp, min_level, stock, available_until, payload, enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     return stmt.run(
       item.key,
       guildId,
       item.name,
       item.description || '',
+      item.category || 'general',
       item.type,
       item.priceCoins || 0,
       item.priceCp || 0,
       item.minLevel || 0,
+      item.stock ?? null,
+      item.availableUntil || null,
       JSON.stringify(item.payload || {}),
       item.enabled === false ? 0 : 1
     );
   }
 
-  getShopItems(guildId) {
-    return this.db.prepare('SELECT * FROM shop_items WHERE guild_id = ? AND enabled = 1 ORDER BY price_coins ASC, name ASC')
-      .all(guildId)
+  getShopItems(guildId, category = null) {
+    const params = [guildId];
+    const filters = ["guild_id = ?", "enabled = 1", "(available_until IS NULL OR datetime(available_until) > datetime('now'))", "(stock IS NULL OR stock > 0)"];
+    if (category) {
+      filters.push('category = ?');
+      params.push(category);
+    }
+    return this.db.prepare(`SELECT * FROM shop_items WHERE ${filters.join(' AND ')} ORDER BY category ASC, price_coins ASC, name ASC`)
+      .all(...params)
       .map(item => ({ ...item, enabled: Boolean(item.enabled), payload: this.parseJSON(item.payload, {}) }));
   }
 
   getShopItem(guildId, key) {
-    const item = this.db.prepare('SELECT * FROM shop_items WHERE guild_id = ? AND key = ? AND enabled = 1').get(guildId, key);
+    const item = this.db.prepare(`
+      SELECT * FROM shop_items
+      WHERE guild_id = ? AND key = ? AND enabled = 1
+        AND (available_until IS NULL OR datetime(available_until) > datetime('now'))
+        AND (stock IS NULL OR stock > 0)
+    `).get(guildId, key);
     if (!item) return null;
     return { ...item, enabled: Boolean(item.enabled), payload: this.parseJSON(item.payload, {}) };
   }
@@ -619,6 +1010,11 @@ class RoguePokeDB {
       DO UPDATE SET quantity = quantity + excluded.quantity
     `);
     return stmt.run(guildId, userId, itemKey, quantity);
+  }
+
+  decrementShopStock(guildId, itemKey, quantity = 1) {
+    return this.db.prepare('UPDATE shop_items SET stock = CASE WHEN stock IS NULL THEN NULL ELSE MAX(0, stock - ?) END WHERE guild_id = ? AND key = ?')
+      .run(quantity, guildId, itemKey);
   }
 
   getInventory(guildId, userId) {
@@ -677,6 +1073,44 @@ class RoguePokeDB {
       WHERE uc.guild_id = ? AND uc.user_id = ?
       ORDER BY c.rarity DESC, c.name ASC
     `).all(guildId, userId);
+  }
+
+  getQuestProgress(guildId, userId, periodKey) {
+    return this.db.prepare('SELECT * FROM quest_progress WHERE guild_id = ? AND user_id = ? AND period_key = ?')
+      .all(guildId, userId, periodKey);
+  }
+
+  getQuestProgressRow(guildId, userId, questKey, periodKey) {
+    return this.db.prepare('SELECT * FROM quest_progress WHERE guild_id = ? AND user_id = ? AND quest_key = ? AND period_key = ?')
+      .get(guildId, userId, questKey, periodKey);
+  }
+
+  incrementQuestProgress(guildId, userId, questKey, periodKey, amount, target) {
+    this.db.prepare(`
+      INSERT OR IGNORE INTO quest_progress (guild_id, user_id, quest_key, period_key)
+      VALUES (?, ?, ?, ?)
+    `).run(guildId, userId, questKey, periodKey);
+
+    this.db.prepare(`
+      UPDATE quest_progress
+      SET progress = MIN(?, progress + ?),
+          completed = CASE WHEN MIN(?, progress + ?) >= ? THEN 1 ELSE completed END,
+          completed_at = CASE WHEN MIN(?, progress + ?) >= ? AND completed_at IS NULL THEN CURRENT_TIMESTAMP ELSE completed_at END
+      WHERE guild_id = ? AND user_id = ? AND quest_key = ? AND period_key = ? AND claimed = 0
+    `).run(target, amount, target, amount, target, target, amount, target, guildId, userId, questKey, periodKey);
+
+    return this.getQuestProgressRow(guildId, userId, questKey, periodKey);
+  }
+
+  claimQuest(guildId, userId, questKey, periodKey) {
+    const row = this.getQuestProgressRow(guildId, userId, questKey, periodKey);
+    if (!row || !row.completed || row.claimed) return null;
+    this.db.prepare(`
+      UPDATE quest_progress
+      SET claimed = 1, claimed_at = CURRENT_TIMESTAMP
+      WHERE guild_id = ? AND user_id = ? AND quest_key = ? AND period_key = ?
+    `).run(guildId, userId, questKey, periodKey);
+    return this.getQuestProgressRow(guildId, userId, questKey, periodKey);
   }
 }
 

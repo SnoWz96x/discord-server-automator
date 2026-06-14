@@ -51,6 +51,21 @@ module.exports = {
         { name: 'Detalhes', value: changes.slice(0, 1024), inline: false }
       );
 
+    client.db.addEventLog({
+      guildId: guild.id,
+      category: categoryForAction(auditLogEntry.action),
+      eventType: String(auditLogEntry.action),
+      actorId: auditLogEntry.executor?.id || null,
+      targetId: auditLogEntry.target?.id || null,
+      summary: title,
+      details: {
+        reason: auditLogEntry.reason || null,
+        target,
+        executor,
+        changes
+      }
+    });
+
     await modlogs.send(guild, embed);
   }
 };
@@ -69,4 +84,23 @@ function colorForAction(action) {
   if ([AuditLogEvent.ChannelCreate, AuditLogEvent.RoleCreate].includes(action)) return 0x57F287;
   if ([AuditLogEvent.ChannelDelete, AuditLogEvent.RoleDelete].includes(action)) return 0xFEE75C;
   return 0x5865F2;
+}
+
+function categoryForAction(action) {
+  if ([AuditLogEvent.MemberKick, AuditLogEvent.MemberBanAdd, AuditLogEvent.MemberBanRemove, AuditLogEvent.MemberUpdate, AuditLogEvent.MemberMove, AuditLogEvent.MemberDisconnect].includes(action)) {
+    return 'moderation';
+  }
+  if ([AuditLogEvent.ChannelCreate, AuditLogEvent.ChannelUpdate, AuditLogEvent.ChannelDelete].includes(action)) {
+    return 'channel';
+  }
+  if ([AuditLogEvent.RoleCreate, AuditLogEvent.RoleUpdate, AuditLogEvent.RoleDelete, AuditLogEvent.MemberRoleUpdate].includes(action)) {
+    return 'role';
+  }
+  if ([AuditLogEvent.MessageDelete, AuditLogEvent.MessageBulkDelete].includes(action)) {
+    return 'message';
+  }
+  if ([AuditLogEvent.AutoModerationBlockMessage, AuditLogEvent.AutoModerationFlagToChannel, AuditLogEvent.AutoModerationUserCommunicationDisabled].includes(action)) {
+    return 'automod';
+  }
+  return 'message';
 }

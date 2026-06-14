@@ -1,0 +1,22 @@
+services:
+  bot:
+    build: .
+    command: npm run start:bot
+    env_file:
+      - discord-bot/.env
+    environment:
+      DATABASE_PATH: /app/data/roguepoke.db
+    volumes:
+      - ./data:/app/data
+
+  dashboard:
+    build: .
+    command: npm run start:dashboard
+    env_file:
+      - discord-bot/.env
+    environment:
+      DATABASE_PATH: /app/data/roguepoke.db
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data

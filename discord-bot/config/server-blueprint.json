@@ -401,6 +401,10 @@
               "name": "Resolvido",
               "emoji": "✅",
               "moderated": true
+            },
+            {
+              "name": "Duplicado",
+              "moderated": true
             }
           ],
           "publicView": true
@@ -437,6 +441,10 @@
               "name": "Aprovada",
               "emoji": "✅",
               "moderated": true
+            },
+            {
+              "name": "Duplicado",
+              "moderated": true
             }
           ],
           "publicView": true
@@ -472,6 +480,10 @@
             {
               "name": "Fechado",
               "emoji": "✅",
+              "moderated": true
+            },
+            {
+              "name": "Duplicado",
               "moderated": true
             }
           ],
@@ -602,7 +614,8 @@
           "emoji": "🎒",
           "description": "Comprou seu primeiro item na lojinha RoguePoke."
         }
-      }
+      },
+      "category": "badges"
     },
     {
       "key": "badge_speedrunner",
@@ -620,7 +633,8 @@
           "emoji": "🏃",
           "description": "Comprou a badge Speedrunner na lojinha."
         }
-      }
+      },
+      "category": "badges"
     },
     {
       "key": "badge_shiny_hunter",
@@ -638,7 +652,8 @@
           "emoji": "✨",
           "description": "Comprou a badge Shiny Hunter na lojinha."
         }
-      }
+      },
+      "category": "badges"
     },
     {
       "key": "profile_spark",
@@ -650,7 +665,8 @@
       "minLevel": 0,
       "payload": {
         "effect": "spark"
-      }
+      },
+      "category": "cosmetics"
     }
   ],
   "panels": {
