@@ -402,7 +402,8 @@
               "emoji": "✅",
               "moderated": true
             }
-          ]
+          ],
+          "publicView": true
         },
         {
           "key": "suggestions",
@@ -437,7 +438,8 @@
               "emoji": "✅",
               "moderated": true
             }
-          ]
+          ],
+          "publicView": true
         },
         {
           "key": "reports",
@@ -472,9 +474,11 @@
               "emoji": "✅",
               "moderated": true
             }
-          ]
+          ],
+          "publicView": true
         }
-      ]
+      ],
+      "publicView": true
     },
     {
       "name": "🎫 SUPORTE",

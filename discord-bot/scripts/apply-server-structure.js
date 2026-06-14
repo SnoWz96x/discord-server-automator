@@ -114,6 +114,7 @@ function baseOverwrites(guild, categoryData, channelData) {
     : null;
   const isStaffOnly = Boolean(categoryData.staffOnly || channelData.staffOnly);
   const isPublic = Boolean(channelData.public);
+  const isPublicView = Boolean(categoryData.publicView || channelData.publicView);
   const isMemberOnly = Boolean(channelData.memberOnly || (!isPublic && !visibilityRole && !isStaffOnly));
 
   if (isStaffOnly) {
@@ -134,6 +135,25 @@ function baseOverwrites(guild, categoryData, channelData) {
     });
     for (const roleId of staffRoleIds()) {
       overwrites.push({ id: roleId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory] });
+    }
+  } else if (member && isPublicView && isMemberOnly) {
+    overwrites.push({
+      id: everyoneId,
+      allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
+      deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.CreatePublicThreads, PermissionFlagsBits.SendMessagesInThreads]
+    });
+    overwrites.push({
+      id: member.id,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.ReadMessageHistory,
+        PermissionFlagsBits.CreatePublicThreads,
+        PermissionFlagsBits.SendMessagesInThreads
+      ]
+    });
+    for (const roleId of staffRoleIds()) {
+      overwrites.push({ id: roleId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] });
     }
   } else if (member && isMemberOnly) {
     overwrites.push({ id: everyoneId, deny: [PermissionFlagsBits.ViewChannel] });
