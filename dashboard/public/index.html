@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RoguePoke Dashboard</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">RP</div>
+        <div>
+          <strong>RoguePoke</strong>
+          <span>Discord Ops</span>
+        </div>
+      </div>
+
+      <nav>
+        <a href="#overview" class="active">Overview</a>
+        <a href="#admin">Admin</a>
+        <a href="#xp">XP & Economia</a>
+        <a href="#badges">Badges</a>
+        <a href="#shop">Loja</a>
+        <a href="#moderation">Moderacao</a>
+        <a href="#tickets">Tickets</a>
+        <a href="#modules">Modulos</a>
+      </nav>
+
+      <div class="sidebar-status">
+        <span id="sidebarDot" class="dot muted"></span>
+        <div>
+          <strong id="sidebarStatus">Checando</strong>
+          <span id="sidebarSub">Aguardando API</span>
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Painel local</p>
+          <h1>Operacao do bot</h1>
+        </div>
+        <div class="toolbar">
+          <button id="refreshBtn" type="button">Atualizar</button>
+          <span id="lastUpdated">Nunca atualizado</span>
+        </div>
+      </header>
+
+      <section id="overview" class="grid overview-grid">
+        <article class="status-panel">
+          <div class="status-head">
+            <div>
+              <p class="eyebrow">Saude</p>
+              <h2 id="botName">RoguePoke Bot</h2>
+            </div>
+            <span id="botBadge" class="badge neutral">Checando</span>
+          </div>
+          <div class="status-meter">
+            <div id="healthRing" class="ring">
+              <span id="healthPercent">--</span>
+            </div>
+            <div class="status-copy">
+              <strong id="guildName">Servidor</strong>
+              <span id="healthMessage">Consultando Discord API e SQLite.</span>
+            </div>
+          </div>
+          <div class="mini-grid">
+            <div><span>Comandos</span><strong id="commandsCount">0</strong></div>
+            <div><span>Canais</span><strong id="channelsCount">0</strong></div>
+            <div><span>Processo</span><strong id="processStatus">--</strong></div>
+          </div>
+        </article>
+
+        <article class="metric-card">
+          <span>Usuarios no banco</span>
+          <strong id="usersCount">0</strong>
+          <small>contas vistas pelo bot</small>
+        </article>
+        <article class="metric-card">
+          <span>Tickets abertos</span>
+          <strong id="openTickets">0</strong>
+          <small>fila atual de suporte</small>
+        </article>
+        <article class="metric-card danger">
+          <span>Warnings</span>
+          <strong id="warningsCount">0</strong>
+          <small>acoes de moderacao</small>
+        </article>
+        <article class="metric-card">
+          <span>XP total</span>
+          <strong id="totalXp">0</strong>
+          <small>atividade acumulada</small>
+        </article>
+        <article class="metric-card">
+          <span>CP total</span>
+          <strong id="totalCp">0</strong>
+          <small>capture points</small>
+        </article>
+        <article class="metric-card">
+          <span>Badges</span>
+          <strong id="badgesCount">0</strong>
+          <small>conquistas entregues</small>
+        </article>
+      </section>
+
+      <section id="admin" class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Centro de comando</p>
+            <h2>Ações administrativas</h2>
+          </div>
+          <span id="adminResult" class="badge neutral">Pronto</span>
+        </div>
+
+        <div class="admin-grid">
+          <form id="moderationForm" class="admin-card">
+            <h3>Moderação</h3>
+            <label>
+              <span>ID do usuário</span>
+              <input name="userId" required placeholder="123456789012345678" />
+            </label>
+            <label>
+              <span>Ação</span>
+              <select name="action">
+                <option value="warn">Warn</option>
+                <option value="timeout">Timeout</option>
+                <option value="untimeout">Remover timeout</option>
+                <option value="kick">Kick</option>
+                <option value="ban">Ban</option>
+              </select>
+            </label>
+            <label>
+              <span>Duração timeout em minutos</span>
+              <input name="durationMinutes" type="number" min="1" max="40320" value="10" />
+            </label>
+            <label>
+              <span>Motivo</span>
+              <textarea name="reason" rows="3" placeholder="Motivo objetivo para log"></textarea>
+            </label>
+            <button type="submit">Executar moderação</button>
+          </form>
+
+          <form id="xpForm" class="admin-card">
+            <h3>XP</h3>
+            <label>
+              <span>ID do usuário</span>
+              <input name="userId" required placeholder="123456789012345678" />
+            </label>
+            <label>
+              <span>Quantidade</span>
+              <input name="amount" type="number" required value="100" />
+            </label>
+            <button type="submit">Adicionar XP</button>
+          </form>
+
+          <form id="coinsForm" class="admin-card">
+            <h3>PokeCoins</h3>
+            <label>
+              <span>ID do usuário</span>
+              <input name="userId" required placeholder="123456789012345678" />
+            </label>
+            <label>
+              <span>Quantidade</span>
+              <input name="amount" type="number" required value="100" />
+            </label>
+            <button type="submit">Adicionar coins</button>
+          </form>
+
+          <form id="cpForm" class="admin-card">
+            <h3>CP</h3>
+            <label>
+              <span>ID do usuário</span>
+              <input name="userId" required placeholder="123456789012345678" />
+            </label>
+            <label>
+              <span>Quantidade</span>
+              <input name="amount" type="number" required value="25" />
+            </label>
+            <button type="submit">Adicionar CP</button>
+          </form>
+
+          <form id="badgeForm" class="admin-card">
+            <h3>Badges</h3>
+            <label>
+              <span>ID do usuário</span>
+              <input name="userId" required placeholder="123456789012345678" />
+            </label>
+            <label>
+              <span>Badge</span>
+              <select id="badgeSelect" name="badgeKey"></select>
+            </label>
+            <button type="submit">Entregar badge</button>
+          </form>
+        </div>
+      </section>
+
+      <section id="xp" class="two-column">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Leaderboard</p>
+              <h2>Top XP</h2>
+            </div>
+          </div>
+          <div id="xpList" class="leaderboard"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Economia</p>
+              <h2>Top Coins</h2>
+            </div>
+          </div>
+          <div id="coinsList" class="leaderboard"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Capture Points</p>
+              <h2>Top CP</h2>
+            </div>
+          </div>
+          <div id="cpList" class="leaderboard"></div>
+        </article>
+      </section>
+
+      <section id="badges" class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Progressao</p>
+            <h2>Badges e recompensas</h2>
+          </div>
+        </div>
+        <div id="badgeList" class="badge-list"></div>
+      </section>
+
+      <section id="shop" class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Economia</p>
+            <h2>Lojinha RoguePoke</h2>
+          </div>
+        </div>
+        <div id="shopList" class="shop-list"></div>
+      </section>
+
+      <section id="moderation" class="two-column wide-left">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Logs</p>
+              <h2>Moderacao recente</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Acao</th>
+                  <th>Usuario</th>
+                  <th>Moderador</th>
+                  <th>Motivo</th>
+                  <th>Quando</th>
+                </tr>
+              </thead>
+              <tbody id="moderationRows"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Resumo</p>
+              <h2>Punicoes</h2>
+            </div>
+          </div>
+          <div id="actionBars" class="bars"></div>
+        </article>
+      </section>
+
+      <section id="tickets" class="two-column">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Suporte</p>
+              <h2>Tickets abertos</h2>
+            </div>
+          </div>
+          <div id="ticketList" class="ticket-list"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Categorias</p>
+              <h2>Fila configurada</h2>
+            </div>
+          </div>
+          <div id="ticketCategories" class="chips"></div>
+        </article>
+      </section>
+
+      <section id="modules" class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Configuracao</p>
+            <h2>Modulos ativos</h2>
+          </div>
+        </div>
+        <div id="moduleGrid" class="module-grid"></div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

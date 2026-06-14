@@ -1,0 +1,315 @@
+{
+  "roles": [
+    {
+      "key": "admin",
+      "name": "👑 Admin",
+      "color": "#E74C3C",
+      "permissions": ["Administrator"],
+      "hoist": true,
+      "mentionable": true
+    },
+    {
+      "key": "moderator",
+      "name": "🛡️ Moderador",
+      "color": "#3498DB",
+      "permissions": ["ManageMessages", "KickMembers", "BanMembers", "ModerateMembers", "ManageChannels", "ViewAuditLog"],
+      "hoist": true,
+      "mentionable": true
+    },
+    {
+      "key": "developer",
+      "name": "💻 Desenvolvedor",
+      "color": "#2ECC71",
+      "permissions": ["ManageChannels", "ManageMessages"],
+      "hoist": true,
+      "mentionable": false
+    },
+    {
+      "key": "member",
+      "name": "⚔️ Membro",
+      "color": "#FFFFFF",
+      "permissions": [],
+      "hoist": false,
+      "mentionable": false
+    },
+    {
+      "key": "portuguese",
+      "name": "🇧🇷 Português",
+      "color": "#57F287",
+      "permissions": [],
+      "hoist": false,
+      "mentionable": false
+    },
+    {
+      "key": "english",
+      "name": "🇺🇸 English",
+      "color": "#5865F2",
+      "permissions": [],
+      "hoist": false,
+      "mentionable": false
+    },
+    {
+      "key": "spanish",
+      "name": "🇪🇸 Español",
+      "color": "#FEE75C",
+      "permissions": [],
+      "hoist": false,
+      "mentionable": false
+    },
+    {
+      "key": "founder",
+      "name": "🏅 Founder",
+      "color": "#F1C40F",
+      "permissions": [],
+      "hoist": true,
+      "mentionable": false
+    },
+    {
+      "key": "level_5",
+      "name": "⭐ Recruta",
+      "color": "#95A5A6",
+      "permissions": [],
+      "hoist": false,
+      "mentionable": false
+    },
+    {
+      "key": "level_10",
+      "name": "⚔️ Guerreiro",
+      "color": "#1ABC9C",
+      "permissions": [],
+      "hoist": false,
+      "mentionable": false
+    },
+    {
+      "key": "level_20",
+      "name": "🛡️ Guardião",
+      "color": "#9B59B6",
+      "permissions": [],
+      "hoist": false,
+      "mentionable": false
+    },
+    {
+      "key": "level_35",
+      "name": "👑 Campeão",
+      "color": "#F39C12",
+      "permissions": [],
+      "hoist": false,
+      "mentionable": false
+    },
+    {
+      "key": "badge_collector_role",
+      "name": "🎒 Colecionador",
+      "color": "#E67E22",
+      "permissions": [],
+      "hoist": false,
+      "mentionable": false
+    },
+    {
+      "key": "badge_speedrunner_role",
+      "name": "🏃 Speedrunner",
+      "color": "#1ABC9C",
+      "permissions": [],
+      "hoist": false,
+      "mentionable": false
+    },
+    {
+      "key": "badge_shiny_hunter_role",
+      "name": "✨ Shiny Hunter",
+      "color": "#F1C40F",
+      "permissions": [],
+      "hoist": false,
+      "mentionable": false
+    },
+    {
+      "key": "muted",
+      "name": "🔇 Silenciado",
+      "color": "#747F8D",
+      "permissions": [],
+      "hoist": false,
+      "mentionable": false
+    }
+  ],
+  "categories": [
+    {
+      "name": "📌 INFORMAÇÕES",
+      "channels": [
+        { "key": "rules", "name": "📋-regras", "type": "text", "topic": "Regras oficiais, conduta e segurança da comunidade RoguePoke.", "locked": true, "public": true },
+        { "key": "verification", "name": "✅-verificação", "type": "text", "topic": "Registro inicial para liberar acesso ao servidor.", "locked": true, "public": true },
+        { "key": "announcements", "name": "📢-announcements", "type": "text", "topic": "Avisos oficiais, atualizações e escolha de idioma.", "locked": true, "public": true },
+        { "key": "changelog", "name": "📝-changelog", "type": "text", "topic": "Mudanças do jogo, bot, servidor e roadmap.", "locked": true, "memberOnly": true },
+        { "key": "faq", "name": "❓-faq", "type": "text", "topic": "Perguntas frequentes e primeiros passos.", "locked": true, "public": true }
+      ]
+    },
+    {
+      "name": "🎮 ROGUEPOKE",
+      "channels": [
+        { "key": "wiki", "name": "📖-wiki", "type": "text", "topic": "Guias oficiais e conhecimento base do RoguePoke.", "locked": true, "memberOnly": true },
+        { "key": "tips", "name": "💡-dicas", "type": "text", "topic": "Dicas rápidas, descobertas e estratégias úteis.", "memberOnly": true },
+        { "key": "builds", "name": "⚔️-builds", "type": "text", "topic": "Builds, times, rotas e teoria da comunidade.", "memberOnly": true },
+        { "key": "speedrun", "name": "🏃-speedrun", "type": "text", "topic": "Runs rápidas, metas, regras e records.", "memberOnly": true },
+        { "key": "bestiary", "name": "🧬-bestiário", "type": "text", "topic": "Descobertas de criaturas, raridades, biomas e encontros.", "memberOnly": true }
+      ]
+    },
+    {
+      "name": "🏆 COMUNIDADE",
+      "channels": [
+        { "key": "hall_of_fame", "name": "🏆-hall-of-fame", "type": "text", "topic": "Conquistas, runs memoráveis e destaques da comunidade.", "locked": false, "memberOnly": true },
+        { "key": "fan_art", "name": "🎨-fan-art", "type": "text", "topic": "Arte, conceitos e criações da comunidade.", "memberOnly": true },
+        { "key": "screenshots", "name": "📸-screenshots", "type": "text", "topic": "Screenshots, clipes e momentos legais.", "memberOnly": true },
+        { "key": "content", "name": "🎥-content", "type": "text", "topic": "Vídeos, lives, posts e conteúdo relacionado.", "memberOnly": true },
+        { "key": "shop", "name": "🛒-lojinha", "type": "text", "topic": "Lojinha RoguePoke: compre badges e cosmeticos com PokeCoins.", "locked": true, "memberOnly": true },
+        { "key": "off_topic", "name": "💬-off-topic", "type": "text", "topic": "Conversa livre mantendo respeito e bom senso.", "memberOnly": true }
+      ]
+    },
+    {
+      "name": "🇧🇷 BR PORTUGUÊS",
+      "visibilityRole": "portuguese",
+      "channels": [
+        { "key": "portuguese_chat", "name": "🇧🇷-roguepoke-br", "type": "text", "topic": "Chat principal em português." },
+        { "key": "portuguese_voice_1", "name": "🔊-Voice-1-BR", "type": "voice" },
+        { "key": "portuguese_voice_2", "name": "🔊-Voice-2-BR", "type": "voice" },
+        { "key": "portuguese_voice_3", "name": "🔊-Voice-3-BR", "type": "voice" }
+      ]
+    },
+    {
+      "name": "🇺🇸 US ENGLISH",
+      "visibilityRole": "english",
+      "channels": [
+        { "key": "english_chat", "name": "🇺🇸-roguepoke-en", "type": "text", "topic": "Main English chat." },
+        { "key": "english_voice_1", "name": "🔊-Voice-1-EN", "type": "voice" },
+        { "key": "english_voice_2", "name": "🔊-Voice-2-EN", "type": "voice" },
+        { "key": "english_voice_3", "name": "🔊-Voice-3-EN", "type": "voice" }
+      ]
+    },
+    {
+      "name": "🇪🇸 ES ESPAÑOL",
+      "visibilityRole": "spanish",
+      "channels": [
+        { "key": "spanish_chat", "name": "🇪🇸-roguepoke-es", "type": "text", "topic": "Chat principal en español." },
+        { "key": "spanish_voice_1", "name": "🔊-Voice-1-ES", "type": "voice" },
+        { "key": "spanish_voice_2", "name": "🔊-Voice-2-ES", "type": "voice" },
+        { "key": "spanish_voice_3", "name": "🔊-Voice-3-ES", "type": "voice" }
+      ]
+    },
+    {
+      "name": "🧪 FEEDBACK",
+      "channels": [
+        { "key": "bugs_ideas", "name": "🐛-bugs-and-ideas", "type": "text", "topic": "Bugs, ideias, melhorias e feedback público.", "memberOnly": true },
+        { "key": "suggestions", "name": "💡-sugestões", "type": "text", "topic": "Sugestões organizadas para jogo, bot e servidor.", "memberOnly": true },
+        { "key": "reports", "name": "🚨-reports", "type": "text", "topic": "Denúncias sensíveis. Prefira ticket quando envolver dados privados.", "memberOnly": true }
+      ]
+    },
+    {
+      "name": "🎫 SUPORTE",
+      "channels": [
+        { "key": "open_ticket", "name": "🎫-abrir-ticket", "type": "text", "topic": "Abra suporte privado com a equipe.", "locked": true, "memberOnly": true },
+        { "key": "ticket_transcripts", "name": "📜-ticket-transcripts", "type": "text", "topic": "Arquivo interno de transcripts de tickets.", "staffOnly": true }
+      ]
+    },
+    {
+      "name": "🛡️ STAFF",
+      "staffOnly": true,
+      "channels": [
+        { "key": "staff_chat", "name": "💬-staff-chat", "type": "text", "topic": "Discussão interna da equipe." },
+        { "key": "mod_logs", "name": "🛡️-mod-logs", "type": "text", "topic": "Logs de moderação, entradas, saídas e eventos do bot." },
+        { "key": "staff_dashboard", "name": "📊-staff-dashboard", "type": "text", "topic": "Status, checklist operacional e links internos." }
+      ]
+    }
+  ],
+  "levelRewards": [
+    { "level": 5, "role": "level_5", "badge": "Primeiros Passos" },
+    { "level": 10, "role": "level_10", "badge": "Estrategista" },
+    { "level": 20, "role": "level_20", "badge": "Guardião da Run" },
+    { "level": 35, "role": "level_35", "badge": "Campeão RoguePoke" }
+  ],
+  "badges": [
+    { "key": "founder", "name": "Founder", "emoji": "🏅", "description": "Membro fundador da comunidade RoguePoke." },
+    { "key": "verified", "name": "Verificado", "emoji": "✅", "description": "Completou o registro inicial." },
+    { "key": "first_steps", "name": "Primeiros Passos", "emoji": "⭐", "description": "Chegou ao nível 5." },
+    { "key": "strategist", "name": "Estrategista", "emoji": "⚔️", "description": "Chegou ao nível 10." },
+    { "key": "guardian", "name": "Guardião da Run", "emoji": "🛡️", "description": "Chegou ao nível 20." },
+    { "key": "champion", "name": "Campeão RoguePoke", "emoji": "👑", "description": "Chegou ao nível 35." }
+  ],
+  "shopItems": [
+    {
+      "key": "badge_collector",
+      "name": "Badge Colecionador",
+      "description": "Badge cosmetica para quem apoia a comunidade desde cedo.",
+      "type": "badge",
+      "priceCoins": 250,
+      "priceCp": 25,
+      "minLevel": 0,
+      "payload": {
+        "role": "badge_collector_role",
+        "badge": { "key": "collector", "name": "Colecionador", "emoji": "🎒", "description": "Comprou seu primeiro item na lojinha RoguePoke." }
+      }
+    },
+    {
+      "key": "badge_speedrunner",
+      "name": "Badge Speedrunner",
+      "description": "Mostra que voce curte runs rapidas e desafios.",
+      "type": "badge",
+      "priceCoins": 600,
+      "priceCp": 80,
+      "minLevel": 5,
+      "payload": {
+        "role": "badge_speedrunner_role",
+        "badge": { "key": "speedrunner", "name": "Speedrunner", "emoji": "🏃", "description": "Comprou a badge Speedrunner na lojinha." }
+      }
+    },
+    {
+      "key": "badge_shiny_hunter",
+      "name": "Badge Shiny Hunter",
+      "description": "Cosmetico raro para cacadores de encontros especiais.",
+      "type": "badge",
+      "priceCoins": 1200,
+      "priceCp": 160,
+      "minLevel": 10,
+      "payload": {
+        "role": "badge_shiny_hunter_role",
+        "badge": { "key": "shiny_hunter", "name": "Shiny Hunter", "emoji": "✨", "description": "Comprou a badge Shiny Hunter na lojinha." }
+      }
+    },
+    {
+      "key": "profile_spark",
+      "name": "Efeito Perfil Spark",
+      "description": "Item cosmetico de inventario para um futuro card de perfil.",
+      "type": "cosmetic",
+      "priceCoins": 450,
+      "priceCp": 50,
+      "minLevel": 0,
+      "payload": { "effect": "spark" }
+    }
+  ],
+  "panels": {
+    "verification": {
+      "channel": "verification",
+      "title": "✅ Registro RoguePoke",
+      "description": "Bem-vindo(a) ao RoguePoke.\n\nClique em **Entrar no RoguePoke** para aceitar o registro inicial, receber o cargo de membro e liberar os canais da comunidade.\n\nDepois disso, escolha seus idiomas em #📢-announcements para ver os chats certos.",
+      "buttonLabel": "Entrar no RoguePoke",
+      "buttonEmoji": "✅"
+    },
+    "language": {
+      "channel": "announcements",
+      "title": "🌍 Escolha seus idiomas",
+      "description": "Ative os idiomas que você quer ver. Você pode marcar mais de um.",
+      "roles": [
+        { "label": "Português", "role": "portuguese", "style": "Success", "emoji": "🇧🇷" },
+        { "label": "English", "role": "english", "style": "Primary", "emoji": "🇺🇸" },
+        { "label": "Español", "role": "spanish", "style": "Secondary", "emoji": "🇪🇸" }
+      ]
+    },
+    "ticket": {
+      "channel": "open_ticket",
+      "staffRole": "moderator",
+      "categoryName": "🎫 TICKETS",
+      "categories": [
+        { "name": "Bug Report", "emoji": "🐛", "color": 15548997 },
+        { "name": "Conta e Acesso", "emoji": "🔐", "color": 3447003 },
+        { "name": "Gameplay", "emoji": "🎮", "color": 5763719 },
+        { "name": "Sugestão", "emoji": "💡", "color": 16776960 },
+        { "name": "Denúncia", "emoji": "🚨", "color": 15158332 }
+      ]
+    }
+  }
+}

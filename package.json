@@ -1,0 +1,29 @@
+{
+  "name": "discord-server-automator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Open source toolkit to automatically create, configure and operate Discord community servers.",
+  "scripts": {
+    "start:bot": "npm --prefix discord-bot start",
+    "start:dashboard": "npm --prefix dashboard start",
+    "test": "npm --prefix discord-bot run test:smoke && npm --prefix discord-bot run test:system",
+    "test:smoke": "npm --prefix discord-bot run test:smoke",
+    "test:system": "npm --prefix discord-bot run test:system",
+    "screenshots": "npm --prefix dashboard run screenshots",
+    "setup:server": "npm --prefix discord-bot run setup:server",
+    "setup:server:dry": "npm --prefix discord-bot run setup:server:dry",
+    "cleanup:roles": "npm --prefix discord-bot run cleanup:roles"
+  },
+  "keywords": [
+    "discord",
+    "discord-bot",
+    "discord-js",
+    "moderation",
+    "tickets",
+    "dashboard",
+    "sqlite",
+    "gamification"
+  ],
+  "author": "Altarugio Digital Studio",
+  "license": "MIT"
+}

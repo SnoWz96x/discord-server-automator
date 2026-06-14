@@ -1,0 +1,25 @@
+{
+  "name": "discord-community-automator-bot",
+  "version": "1.0.0",
+  "description": "Config-driven all-in-one Discord community automation bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "setup:server": "node scripts/apply-server-structure.js",
+    "setup:server:dry": "node scripts/apply-server-structure.js --dry-run",
+    "cleanup:roles": "node scripts/cleanup-legacy-roles.js",
+    "test:smoke": "node scripts/smoke-test.js",
+    "test:system": "node scripts/system-check.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "better-sqlite3": "^11.7.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  },
+  "author": "Altarugio Digital Studio",
+  "license": "MIT"
+}
