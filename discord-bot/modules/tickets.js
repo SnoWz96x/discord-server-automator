@@ -5,8 +5,11 @@ const {
   ChannelType,
   AttachmentBuilder,
   EmbedBuilder,
+  ModalBuilder,
   PermissionFlagsBits,
-  StringSelectMenuBuilder
+  StringSelectMenuBuilder,
+  TextInputBuilder,
+  TextInputStyle
 } = require('discord.js');
 
 module.exports = {
@@ -41,10 +44,10 @@ module.exports = {
       .setCustomId('ticket_category')
       .setPlaceholder('Selecione o tipo de suporte...')
       .addOptions(
-        categories.slice(0, 25).map(cat => {
+        categories.slice(0, 25).map((cat, index) => {
           const option = {
             label: cat.name,
-            value: cat.name,
+            value: String(index),
             description: `Abrir ticket de ${cat.name}`
           };
           if (cat.emoji) option.emoji = cat.emoji;
@@ -66,10 +69,75 @@ module.exports = {
 
   async handleSelectMenu(interaction, client) {
     if (interaction.customId !== 'ticket_category') return;
-    return this.createTicket(interaction, client, interaction.values[0]);
+    return this.showTicketModal(interaction, client, interaction.values[0]);
   },
 
-  async createTicket(interaction, client, category) {
+  async showTicketModal(interaction, client, categoryIndex) {
+    const config = client.db.getTicketConfig(interaction.guild.id);
+    if (!config || !config.enabled) {
+      return interaction.reply({ content: 'Sistema de tickets desabilitado.', ephemeral: true });
+    }
+
+    const category = config.categories[Number(categoryIndex)]?.name;
+    if (!category) {
+      return interaction.reply({ content: 'Categoria de ticket invalida.', ephemeral: true });
+    }
+
+    const modal = new ModalBuilder()
+      .setCustomId(`ticket_intake_${categoryIndex}`)
+      .setTitle(`Ticket: ${category}`.slice(0, 45));
+
+    const summary = new TextInputBuilder()
+      .setCustomId('summary')
+      .setLabel('O que aconteceu?')
+      .setStyle(TextInputStyle.Paragraph)
+      .setRequired(true)
+      .setMaxLength(900)
+      .setPlaceholder('Descreva o problema ou pedido com contexto.');
+
+    const when = new TextInputBuilder()
+      .setCustomId('when')
+      .setLabel('Quando aconteceu?')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(false)
+      .setMaxLength(120)
+      .setPlaceholder('Ex.: hoje as 15h, depois da ultima atualizacao...');
+
+    const evidence = new TextInputBuilder()
+      .setCustomId('evidence')
+      .setLabel('Prints, links, IDs ou passos ajudam?')
+      .setStyle(TextInputStyle.Paragraph)
+      .setRequired(false)
+      .setMaxLength(900)
+      .setPlaceholder('Cole IDs, links ou passos para reproduzir. Prints podem ser enviados depois no ticket.');
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(summary),
+      new ActionRowBuilder().addComponents(when),
+      new ActionRowBuilder().addComponents(evidence)
+    );
+
+    return interaction.showModal(modal);
+  },
+
+  async handleModalSubmit(interaction, client) {
+    if (!interaction.customId.startsWith('ticket_intake_')) return;
+
+    const categoryIndex = interaction.customId.replace('ticket_intake_', '');
+    const config = client.db.getTicketConfig(interaction.guild.id);
+    const category = config?.categories?.[Number(categoryIndex)]?.name;
+    if (!category) {
+      return interaction.reply({ content: 'Categoria de ticket invalida.', ephemeral: true });
+    }
+
+    return this.createTicket(interaction, client, category, {
+      summary: interaction.fields.getTextInputValue('summary'),
+      when: interaction.fields.getTextInputValue('when') || 'Nao informado',
+      evidence: interaction.fields.getTextInputValue('evidence') || 'Nao informado'
+    });
+  },
+
+  async createTicket(interaction, client, category, intake = null) {
     const config = client.db.getTicketConfig(interaction.guild.id);
     if (!config || !config.enabled) {
       return interaction.reply({ content: 'Sistema de tickets desabilitado.', ephemeral: true });
@@ -133,12 +201,14 @@ module.exports = {
         .setDescription([
           `Ola ${interaction.user}.`,
           '',
-          'Descreva o problema com o maximo de contexto:',
-          '- O que aconteceu?',
-          '- Quando aconteceu?',
-          '- Prints ou IDs ajudam?',
+          '**Resumo inicial:**',
+          intake?.summary || 'Nao informado',
           '',
-          'A staff pode clicar em **Atender** para assumir e **Transcript** para salvar o historico.'
+          `**Quando aconteceu?** ${intake?.when || 'Nao informado'}`,
+          `**Prints, links, IDs ou passos:** ${intake?.evidence || 'Nao informado'}`,
+          '',
+          'A staff pode clicar em **Atender** para assumir e **Transcript** para salvar o historico.',
+          'Voce tambem pode enviar prints e detalhes adicionais neste canal.'
         ].join('\n'))
         .setTimestamp();
 
@@ -238,7 +308,7 @@ module.exports = {
       `Ticket: ${interaction.channel.name}`,
       `Categoria: ${ticket.category}`,
       `Usuario: ${ticket.user_id}`,
-      `Canal: ${interaction.channel.id}`,
+      `Canal: ${interaction.channel.name} (${interaction.channel.id})`,
       `Gerado em: ${new Date().toISOString()}`,
       ``,
       `---`,
@@ -262,7 +332,7 @@ module.exports = {
     const transcriptChannel = interaction.guild.channels.cache.find(channel => channel.name.endsWith('-ticket-transcripts'));
     if (transcriptChannel) {
       await transcriptChannel.send({
-        content: `Transcript de ${interaction.channel} | usuario <@${ticket.user_id}> | categoria ${ticket.category}`,
+        content: `Transcript de #${interaction.channel.name} (${interaction.channel.id}) | usuario <@${ticket.user_id}> | categoria ${ticket.category}`,
         files: [attachment]
       });
     }

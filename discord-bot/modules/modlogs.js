@@ -8,8 +8,15 @@ module.exports = {
   },
 
   getLogChannel(guild) {
-    return guild.channels.cache.find(
-      channel => channel.type === ChannelType.GuildText && channel.name === 'mod-logs'
+    const configuredId = guild.client?.db?.getGuild(guild.id)?.config?.modLogChannelId;
+    if (configuredId) {
+      const configured = guild.channels.cache.get(configuredId);
+      if (configured) return configured;
+    }
+
+    return guild.channels.cache.find(channel =>
+      channel.type === ChannelType.GuildText &&
+      (channel.name === 'mod-logs' || channel.name.endsWith('-mod-logs') || channel.name.includes('mod-logs'))
     );
   },
 

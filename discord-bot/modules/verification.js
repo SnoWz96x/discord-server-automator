@@ -1,4 +1,4 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 
 module.exports = {
   name: 'verification',
@@ -14,27 +14,8 @@ module.exports = {
     const channel = member.guild.channels.cache.get(config.channel_id);
     if (!channel) return;
 
-    const embed = new EmbedBuilder()
-      .setColor('#DCFF00')
-      .setTitle('Registro RoguePoke')
-      .setDescription(`Bem-vindo(a), ${member}.\n\nClique no botao abaixo para liberar seu acesso ao servidor.`)
-      .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-      .setTimestamp();
-
-    const button = new ButtonBuilder()
-      .setCustomId('verify_captcha')
-      .setLabel(config.button_label || 'Entrar no RoguePoke')
-      .setStyle(ButtonStyle.Success);
-
-    if (config.button_emoji) {
-      button.setEmoji(config.button_emoji);
-    }
-
-    const row = new ActionRowBuilder().addComponents(button);
-
-    await channel.send({ embeds: [embed], components: [row] }).catch(error => {
-      console.error('Error sending verification message:', error);
-    });
+    await member.send(`Bem-vindo(a) ao ${member.guild.name}! Para liberar o servidor, abra ${channel} e clique em **${config.button_label || 'Verificar'}**.`)
+      .catch(() => {});
   },
 
   async handleButton(interaction, client) {
@@ -57,6 +38,7 @@ module.exports = {
     try {
       await interaction.member.roles.add(role);
       client.db.createUser(interaction.user.id, interaction.guild.id, interaction.user.username);
+      client.db.setVerified(interaction.user.id, interaction.guild.id, true);
       client.db.awardBadge(interaction.guild.id, interaction.user.id, 'verified');
 
       const successEmbed = new EmbedBuilder()
@@ -66,6 +48,17 @@ module.exports = {
         .setTimestamp();
 
       await interaction.reply({ embeds: [successEmbed], ephemeral: true });
+
+      const modlogs = client.modules.get('modlogs');
+      if (modlogs) {
+        const logEmbed = modlogs.baseEmbed('Cadastro: membro verificado', 0x57F287)
+          .addFields(
+            { name: 'Usuario', value: `${interaction.user.tag} (${interaction.user.id})`, inline: false },
+            { name: 'Cargo recebido', value: role.name, inline: true }
+          );
+        await modlogs.send(interaction.guild, logEmbed);
+      }
+
       console.log(`${interaction.user.tag} verified in ${interaction.guild.name}`);
     } catch (error) {
       console.error('Error verifying user:', error);

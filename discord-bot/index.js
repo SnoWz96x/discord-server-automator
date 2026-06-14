@@ -120,6 +120,14 @@ client.on('interactionCreate', async (interaction) => {
         const reactionModule = client.modules.get('reactionroles');
         if (reactionModule) await reactionModule.handleSelectMenu(interaction, client, params);
       }
+      return;
+    }
+
+    if (interaction.isModalSubmit()) {
+      if (interaction.customId.startsWith('ticket_intake_')) {
+        const ticketModule = client.modules.get('tickets');
+        if (ticketModule) await ticketModule.handleModalSubmit(interaction, client);
+      }
     }
   } catch (error) {
     console.error('Error handling interaction:', error);

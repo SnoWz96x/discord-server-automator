@@ -66,7 +66,7 @@ function mergeOverwrites(overwrites) {
 
   return [...merged.values()].map(overwrite => ({
     id: overwrite.id,
-    allow: [...new Set(overwrite.allow)],
+    allow: [...new Set(overwrite.allow)].filter(permission => !new Set(overwrite.deny).has(permission)),
     deny: [...new Set(overwrite.deny)]
   }));
 }
@@ -109,7 +109,9 @@ function baseOverwrites(guild, categoryData, channelData) {
   const everyoneId = guild.roles.everyone.id;
   const member = state.roles.get('member');
   const muted = state.roles.get('muted');
-  const visibilityRole = categoryData.visibilityRole ? state.roles.get(categoryData.visibilityRole) : null;
+  const visibilityRole = categoryData.visibilityRole && categoryData.restrictToRole
+    ? state.roles.get(categoryData.visibilityRole)
+    : null;
   const isStaffOnly = Boolean(categoryData.staffOnly || channelData.staffOnly);
   const isPublic = Boolean(channelData.public);
   const isMemberOnly = Boolean(channelData.memberOnly || (!isPublic && !visibilityRole && !isStaffOnly));
@@ -145,9 +147,17 @@ function baseOverwrites(guild, categoryData, channelData) {
   }
 
   if (channelData.locked) {
-    overwrites.push({ id: everyoneId, deny: [PermissionFlagsBits.SendMessages] });
+    const lockedDenies = [
+      PermissionFlagsBits.SendMessages,
+      PermissionFlagsBits.CreatePublicThreads,
+      PermissionFlagsBits.CreatePrivateThreads,
+      PermissionFlagsBits.SendMessagesInThreads
+    ];
+    overwrites.push({ id: everyoneId, deny: lockedDenies });
+    if (member) overwrites.push({ id: member.id, deny: lockedDenies });
+    if (visibilityRole) overwrites.push({ id: visibilityRole.id, deny: lockedDenies });
     for (const roleId of staffRoleIds()) {
-      overwrites.push({ id: roleId, allow: [PermissionFlagsBits.SendMessages] });
+      overwrites.push({ id: roleId, allow: lockedDenies });
     }
   }
 
@@ -178,7 +188,7 @@ async function syncChannelSettings(channel, guild, category, categoryData, chann
 
   const edits = {};
   if (category && channel.parentId !== category.id) edits.parent = category.id;
-  if (channel.type === ChannelType.GuildText && channelData.topic && channel.topic !== channelData.topic) {
+  if ((channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildForum) && channelData.topic && channel.topic !== channelData.topic) {
     edits.topic = channelData.topic;
   }
 
@@ -196,7 +206,10 @@ async function syncChannelSettings(channel, guild, category, categoryData, chann
       ReadMessageHistory: overwrite.allow.includes(PermissionFlagsBits.ReadMessageHistory) ? true : overwrite.deny.includes(PermissionFlagsBits.ReadMessageHistory) ? false : null,
       Connect: overwrite.allow.includes(PermissionFlagsBits.Connect) ? true : overwrite.deny.includes(PermissionFlagsBits.Connect) ? false : null,
       Speak: overwrite.allow.includes(PermissionFlagsBits.Speak) ? true : overwrite.deny.includes(PermissionFlagsBits.Speak) ? false : null,
-      AddReactions: overwrite.allow.includes(PermissionFlagsBits.AddReactions) ? true : overwrite.deny.includes(PermissionFlagsBits.AddReactions) ? false : null
+      AddReactions: overwrite.allow.includes(PermissionFlagsBits.AddReactions) ? true : overwrite.deny.includes(PermissionFlagsBits.AddReactions) ? false : null,
+      CreatePublicThreads: overwrite.allow.includes(PermissionFlagsBits.CreatePublicThreads) ? true : overwrite.deny.includes(PermissionFlagsBits.CreatePublicThreads) ? false : null,
+      CreatePrivateThreads: overwrite.allow.includes(PermissionFlagsBits.CreatePrivateThreads) ? true : overwrite.deny.includes(PermissionFlagsBits.CreatePrivateThreads) ? false : null,
+      SendMessagesInThreads: overwrite.allow.includes(PermissionFlagsBits.SendMessagesInThreads) ? true : overwrite.deny.includes(PermissionFlagsBits.SendMessagesInThreads) ? false : null
     }).catch(error => {
       console.error(`Error syncing overwrite for ${channel.name}:`, error.message);
     });
@@ -247,7 +260,10 @@ async function syncCategorySettings(category, guild, categoryData) {
       ReadMessageHistory: overwrite.allow.includes(PermissionFlagsBits.ReadMessageHistory) ? true : overwrite.deny.includes(PermissionFlagsBits.ReadMessageHistory) ? false : null,
       Connect: overwrite.allow.includes(PermissionFlagsBits.Connect) ? true : overwrite.deny.includes(PermissionFlagsBits.Connect) ? false : null,
       Speak: overwrite.allow.includes(PermissionFlagsBits.Speak) ? true : overwrite.deny.includes(PermissionFlagsBits.Speak) ? false : null,
-      AddReactions: overwrite.allow.includes(PermissionFlagsBits.AddReactions) ? true : overwrite.deny.includes(PermissionFlagsBits.AddReactions) ? false : null
+      AddReactions: overwrite.allow.includes(PermissionFlagsBits.AddReactions) ? true : overwrite.deny.includes(PermissionFlagsBits.AddReactions) ? false : null,
+      CreatePublicThreads: overwrite.allow.includes(PermissionFlagsBits.CreatePublicThreads) ? true : overwrite.deny.includes(PermissionFlagsBits.CreatePublicThreads) ? false : null,
+      CreatePrivateThreads: overwrite.allow.includes(PermissionFlagsBits.CreatePrivateThreads) ? true : overwrite.deny.includes(PermissionFlagsBits.CreatePrivateThreads) ? false : null,
+      SendMessagesInThreads: overwrite.allow.includes(PermissionFlagsBits.SendMessagesInThreads) ? true : overwrite.deny.includes(PermissionFlagsBits.SendMessagesInThreads) ? false : null
     }).catch(error => {
       console.error(`Error syncing category ${category.name}:`, error.message);
     });
@@ -257,16 +273,36 @@ async function syncCategorySettings(category, guild, categoryData) {
 }
 
 async function findOrCreateChannel(guild, category, categoryData, channelData) {
-  const type = channelData.type === 'voice' ? ChannelType.GuildVoice : ChannelType.GuildText;
-  const existing = guild.channels.cache.find(
-    channel => channel.type === type && normalizeName(channel.name) === normalizeName(channelData.name)
-  );
+  const type = channelData.type === 'voice'
+    ? ChannelType.GuildVoice
+    : channelData.type === 'forum'
+      ? ChannelType.GuildForum
+      : ChannelType.GuildText;
+  const sameName = guild.channels.cache.filter(channel => normalizeName(channel.name) === normalizeName(channelData.name));
+  const existing = sameName.find(channel => channel.type === type);
 
   if (existing) {
     state.channels.set(channelData.key, existing);
     log(`channel exists: ${channelData.name}`);
     await syncChannelSettings(existing, guild, category, categoryData, channelData);
     return existing;
+  }
+
+  const incompatible = sameName.first();
+  if (incompatible) {
+    if (dryRun) {
+      log(`would archive incompatible ${channelData.name} before creating ${channelData.type || 'text'} channel`);
+    } else {
+      const archiveName = `arquivo-${incompatible.name}`.slice(0, 100);
+      await incompatible.edit({
+        name: archiveName,
+        reason: 'Archive incompatible channel type before recreating blueprint channel'
+      }).catch(error => {
+        console.error(`Error archiving channel ${incompatible.name}:`, error.message);
+      });
+      await lockArchivedChannel(incompatible, guild);
+      log(`channel archived: ${archiveName}`);
+    }
   }
 
   if (dryRun) {
@@ -278,7 +314,7 @@ async function findOrCreateChannel(guild, category, categoryData, channelData) {
     name: channelData.name,
     type,
     parent: category?.id ?? null,
-    topic: type === ChannelType.GuildText ? channelData.topic ?? null : undefined,
+    topic: type === ChannelType.GuildText || type === ChannelType.GuildForum ? channelData.topic ?? null : undefined,
     permissionOverwrites: baseOverwrites(guild, categoryData, channelData),
     reason: 'RoguePoke server structure setup'
   });
@@ -286,6 +322,56 @@ async function findOrCreateChannel(guild, category, categoryData, channelData) {
   state.channels.set(channelData.key, channel);
   log(`channel created: ${channel.name}`);
   return channel;
+}
+
+async function lockArchivedChannel(channel, guild) {
+  if (!channel || dryRun) return;
+
+  const member = state.roles.get('member');
+  const overwrites = [
+    { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] }
+  ];
+  if (member) overwrites.push({ id: member.id, deny: [PermissionFlagsBits.ViewChannel] });
+  for (const roleId of staffRoleIds()) {
+    overwrites.push({
+      id: roleId,
+      allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory]
+    });
+  }
+
+  for (const overwrite of mergeOverwrites(overwrites)) {
+    await channel.permissionOverwrites.edit(overwrite.id, {
+      ViewChannel: overwrite.allow.includes(PermissionFlagsBits.ViewChannel) ? true : overwrite.deny.includes(PermissionFlagsBits.ViewChannel) ? false : null,
+      SendMessages: overwrite.allow.includes(PermissionFlagsBits.SendMessages) ? true : overwrite.deny.includes(PermissionFlagsBits.SendMessages) ? false : null,
+      ReadMessageHistory: overwrite.allow.includes(PermissionFlagsBits.ReadMessageHistory) ? true : overwrite.deny.includes(PermissionFlagsBits.ReadMessageHistory) ? false : null
+    }).catch(error => {
+      console.error(`Error locking archive ${channel.name}:`, error.message);
+    });
+  }
+}
+
+async function clearRecentBotMessages(channel, reason) {
+  if (!channel || dryRun) return;
+
+  const messages = await channel.messages.fetch({ limit: 25 }).catch(() => null);
+  if (!messages) return;
+
+  const botMessages = messages.filter(message => message.author.id === client.user.id && !message.pinned);
+  for (const message of botMessages.values()) {
+    await message.delete().catch(error => {
+      console.error(`Could not delete old bot message in #${channel.name}:`, error.message);
+    });
+  }
+
+  if (botMessages.size > 0) log(`${reason}: removed ${botMessages.size} old bot message(s) in #${channel.name}`);
+}
+
+async function lockExistingArchiveChannels(guild) {
+  const archiveChannels = guild.channels.cache.filter(channel => channel.name.startsWith('arquivo-'));
+  for (const channel of archiveChannels.values()) {
+    await lockArchivedChannel(channel, guild);
+    log(`archive locked: ${channel.name}`);
+  }
 }
 
 async function sendVerificationPanel(guild) {
@@ -304,6 +390,8 @@ async function sendVerificationPanel(guild) {
     log(`would configure verification panel in #${channel.name}`);
     return;
   }
+
+  if (refreshPanels) await clearRecentBotMessages(channel, 'verification refresh');
 
   db.setVerificationConfig(guild.id, {
     enabled: true,
@@ -345,6 +433,8 @@ async function sendLanguagePanel() {
     log(`would send language role panel in #${channel.name}`);
     return;
   }
+
+  if (refreshPanels) await clearRecentBotMessages(channel, 'language refresh');
 
   const roles = panel.roles
     .map(item => ({ ...item, roleObject: state.roles.get(item.role) }))
@@ -390,6 +480,8 @@ async function sendTicketPanel(guild) {
     log(`would configure ticket panel in #${channel.name}`);
     return;
   }
+
+  if (refreshPanels) await clearRecentBotMessages(channel, 'ticket refresh');
 
   db.setTicketConfig(guild.id, {
     enabled: true,
@@ -597,20 +689,20 @@ function configureCoreBotFeatures(guild) {
     return;
   }
 
-  const announcements = state.channels.get('announcements');
+  const welcomeChannel = state.channels.get('welcome');
   const portugueseChat = state.channels.get('portuguese_chat');
   const modLogs = state.channels.get('mod_logs');
   const tempVoice = state.channels.get('portuguese_voice_1') || state.channels.get('english_voice_1');
 
   db.createGuild(guild.id, guild.name);
 
-  if (announcements) {
+  if (welcomeChannel) {
     db.setWelcomeConfig(guild.id, {
       enabled: true,
-      channelId: announcements.id,
+      channelId: welcomeChannel.id,
       dmEnabled: false,
       dmMessage: `Bem-vindo(a) ao ${guild.name}!`,
-      embedTitle: `Bem-vindo(a) ao ${guild.name}`,
+      embedTitle: null,
       embedDescription: 'Bem-vindo(a), {user}! Leia as regras, registre-se e escolha seus idiomas.',
       embedColor: '#DCFF00',
       embedThumbnail: null
@@ -727,6 +819,8 @@ client.once('clientReady', async () => {
         await findOrCreateChannel(guild, category, categoryData, channelData);
       }
     }
+
+    await lockExistingArchiveChannels(guild);
 
     configureCoreBotFeatures(guild);
     await assignOwnerRole(guild);

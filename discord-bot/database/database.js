@@ -316,6 +316,11 @@ class RoguePokeDB {
     return stmt.run(username, userId, guildId);
   }
 
+  setVerified(userId, guildId, verified = true) {
+    const stmt = this.db.prepare('UPDATE users SET verified = ? WHERE id = ? AND guild_id = ?');
+    return stmt.run(verified ? 1 : 0, userId, guildId);
+  }
+
   updateUserXP(userId, guildId, xp) {
     const stmt = this.db.prepare('UPDATE users SET xp = xp + ? WHERE id = ? AND guild_id = ?');
     return stmt.run(xp, userId, guildId);
