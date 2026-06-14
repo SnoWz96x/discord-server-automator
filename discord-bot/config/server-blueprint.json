@@ -373,22 +373,106 @@
           "key": "bugs_ideas",
           "name": "🐛-bugs-and-ideas",
           "type": "forum",
-          "topic": "Bugs, ideias, melhorias e feedback publico. Crie uma postagem por assunto com passos, contexto e prints.",
-          "memberOnly": true
+          "topic": "Bugs, ideias e melhorias publicas. Crie uma postagem por assunto com passos, contexto e prints.",
+          "memberOnly": true,
+          "defaultReactionEmoji": "👍",
+          "tags": [
+            {
+              "name": "Bug",
+              "emoji": "🐛",
+              "moderated": false
+            },
+            {
+              "name": "Ideia",
+              "emoji": "💡",
+              "moderated": false
+            },
+            {
+              "name": "UI/UX",
+              "emoji": "🎨",
+              "moderated": false
+            },
+            {
+              "name": "Balanceamento",
+              "emoji": "⚖️",
+              "moderated": false
+            },
+            {
+              "name": "Resolvido",
+              "emoji": "✅",
+              "moderated": true
+            }
+          ]
         },
         {
           "key": "suggestions",
           "name": "💡-sugestões",
           "type": "forum",
-          "topic": "Sugestoes organizadas para jogo, bot e servidor. Crie uma postagem por ideia.",
-          "memberOnly": true
+          "topic": "Sugestoes organizadas para jogo, bot e servidor. Crie uma postagem por ideia e explique impacto esperado.",
+          "memberOnly": true,
+          "defaultReactionEmoji": "👍",
+          "tags": [
+            {
+              "name": "Jogo",
+              "emoji": "🎮",
+              "moderated": false
+            },
+            {
+              "name": "Servidor",
+              "emoji": "🏠",
+              "moderated": false
+            },
+            {
+              "name": "Bot",
+              "emoji": "🤖",
+              "moderated": false
+            },
+            {
+              "name": "Economia",
+              "emoji": "💎",
+              "moderated": false
+            },
+            {
+              "name": "Aprovada",
+              "emoji": "✅",
+              "moderated": true
+            }
+          ]
         },
         {
           "key": "reports",
           "name": "🚨-reports",
           "type": "forum",
-          "topic": "Reports publicos organizados. Prefira ticket quando envolver dados privados.",
-          "memberOnly": true
+          "topic": "Reports publicos organizados. Use ticket quando envolver conta, denuncia sensivel ou dados privados.",
+          "memberOnly": true,
+          "defaultReactionEmoji": "👀",
+          "tags": [
+            {
+              "name": "Moderacao",
+              "emoji": "🛡️",
+              "moderated": false
+            },
+            {
+              "name": "Exploit",
+              "emoji": "⚠️",
+              "moderated": false
+            },
+            {
+              "name": "Conta",
+              "emoji": "🔐",
+              "moderated": false
+            },
+            {
+              "name": "Investigando",
+              "emoji": "🔎",
+              "moderated": true
+            },
+            {
+              "name": "Fechado",
+              "emoji": "✅",
+              "moderated": true
+            }
+          ]
         }
       ]
     },

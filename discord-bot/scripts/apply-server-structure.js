@@ -192,6 +192,11 @@ async function syncChannelSettings(channel, guild, category, categoryData, chann
     edits.topic = channelData.topic;
   }
 
+  if (channel.type === ChannelType.GuildForum) {
+    const forumEdits = forumSettings(channelData);
+    Object.assign(edits, forumEdits);
+  }
+
   if (Object.keys(edits).length > 0) {
     await channel.edit({ ...edits, reason: 'RoguePoke permission sync' }).catch(error => {
       console.error(`Error editing channel ${channel.name}:`, error.message);
@@ -216,6 +221,27 @@ async function syncChannelSettings(channel, guild, category, categoryData, chann
   }
 
   log(`permissions synced: ${channel.name}`);
+}
+
+function forumSettings(channelData) {
+  const settings = {};
+
+  if (Array.isArray(channelData.tags)) {
+    settings.availableTags = channelData.tags.slice(0, 20).map(tag => ({
+      name: tag.name,
+      moderated: Boolean(tag.moderated),
+      emoji: tag.emoji ? { name: tag.emoji } : undefined
+    }));
+  }
+
+  if (channelData.defaultReactionEmoji) {
+    settings.defaultReactionEmoji = { name: channelData.defaultReactionEmoji };
+  }
+
+  settings.defaultAutoArchiveDuration = channelData.defaultAutoArchiveDuration || 10080;
+  settings.rateLimitPerUser = channelData.rateLimitPerUser || 30;
+
+  return settings;
 }
 
 async function findOrCreateCategory(guild, categoryData) {
@@ -315,6 +341,7 @@ async function findOrCreateChannel(guild, category, categoryData, channelData) {
     type,
     parent: category?.id ?? null,
     topic: type === ChannelType.GuildText || type === ChannelType.GuildForum ? channelData.topic ?? null : undefined,
+    ...(type === ChannelType.GuildForum ? forumSettings(channelData) : {}),
     permissionOverwrites: baseOverwrites(guild, categoryData, channelData),
     reason: 'RoguePoke server structure setup'
   });
