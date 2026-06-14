@@ -845,6 +845,7 @@ client.once('clientReady', async () => {
       for (const channelData of categoryData.channels) {
         await findOrCreateChannel(guild, category, categoryData, channelData);
       }
+      await sortCategoryChannels(categoryData);
     }
 
     await lockExistingArchiveChannels(guild);
@@ -862,7 +863,23 @@ client.once('clientReady', async () => {
     process.exitCode = 1;
   } finally {
     client.destroy();
+}
+
+async function sortCategoryChannels(categoryData) {
+  if (dryRun) return;
+
+  for (let index = 0; index < (categoryData.channels || []).length; index++) {
+    const channelData = categoryData.channels[index];
+    const channel = state.channels.get(channelData.key);
+    if (!channel) continue;
+
+    await channel.setPosition(index, {
+      reason: 'Sync channel order from server blueprint'
+    }).catch(error => {
+      console.error(`Error sorting channel ${channel.name}:`, error.message);
+    });
   }
+}
 });
 
 client.login(token);
