@@ -151,6 +151,12 @@ Open:
 http://127.0.0.1:3000
 ```
 
+## Free 24/7 Hosting
+
+Recommended target: Oracle Cloud Always Free VM.
+
+Production deploy guide: [docs/DEPLOY_ORACLE_FREE.md](docs/DEPLOY_ORACLE_FREE.md)
+
 ## Server Setup
 
 Dry run:

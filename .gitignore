@@ -16,5 +16,6 @@ discord-bot/test.js
 discord-bot/test-real.js
 tmp/
 data/
+backups/
 coverage/
 npm-debug.log*
