@@ -300,6 +300,8 @@ See [SECURITY.md](SECURITY.md).
 
 See [docs/GITHUB_PORTFOLIO.md](docs/GITHUB_PORTFOLIO.md) for repository topics, publish checklist and suggested GitHub copy.
 
+Loritta-inspired product roadmap: [docs/LORITTA_FEATURE_GAP_PLAN.md](docs/LORITTA_FEATURE_GAP_PLAN.md).
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).

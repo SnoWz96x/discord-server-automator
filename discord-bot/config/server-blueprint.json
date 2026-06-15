@@ -146,6 +146,14 @@
       "name": "📌 INFORMAÇÕES",
       "channels": [
         {
+          "key": "start_here",
+          "name": "🎮-roguepoke",
+          "type": "text",
+          "topic": "Entrada visual do RoguePoke, primeiros passos e identidade do servidor.",
+          "locked": true,
+          "public": true
+        },
+        {
           "key": "rules",
           "name": "📋-regras",
           "type": "text",
@@ -162,6 +170,14 @@
           "public": true
         },
         {
+          "key": "language_select",
+          "name": "🌐-idiomas",
+          "type": "text",
+          "topic": "Escolha seus idiomas e paises para liberar os chats certos.",
+          "locked": true,
+          "public": true
+        },
+        {
           "key": "welcome",
           "name": "👋-welcome",
           "type": "text",
@@ -173,7 +189,7 @@
           "key": "announcements",
           "name": "📢-announcements",
           "type": "text",
-          "topic": "Avisos oficiais, atualizações e escolha de idioma.",
+          "topic": "Avisos oficiais, atualizacoes importantes e comunicados da equipe RoguePoke.",
           "locked": true,
           "public": true
         },
@@ -673,14 +689,14 @@
     "verification": {
       "channel": "verification",
       "title": "✅ Registro RoguePoke",
-      "description": "Bem-vindo(a) ao RoguePoke.\n\nClique em **Entrar no RoguePoke** para aceitar o registro inicial, receber o cargo de membro e liberar os canais da comunidade.\n\nDepois disso, escolha seus idiomas em #📢-announcements para ver os chats certos.",
+      "description": "Bem-vindo(a) ao RoguePoke.\n\nClique em **Entrar no RoguePoke** para aceitar o registro inicial, receber o cargo de membro e liberar os canais da comunidade.\n\nDepois disso, escolha seus idiomas em #🌐-idiomas para ver os chats certos.",
       "buttonLabel": "Entrar no RoguePoke",
       "buttonEmoji": "✅"
     },
     "language": {
-      "channel": "announcements",
-      "title": "🌍 Escolha seus idiomas",
-      "description": "Ative os idiomas que você quer ver. Você pode marcar mais de um.",
+      "channel": "language_select",
+      "title": "🌐 Escolha seus idiomas",
+      "description": "Ative os idiomas que voce quer acompanhar. Voce pode marcar mais de um para ver mais conversas e se identificar melhor na comunidade.",
       "roles": [
         {
           "label": "Português",

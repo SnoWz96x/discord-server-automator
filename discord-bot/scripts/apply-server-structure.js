@@ -413,6 +413,35 @@ async function clearRecentBotMessages(channel, reason) {
   if (botMessages.size > 0) log(`${reason}: removed ${botMessages.size} old bot message(s) in #${channel.name}`);
 }
 
+async function cleanupLegacyLanguagePanels(guild, targetChannelId, roleIds) {
+  if (!roleIds.length || dryRun) return;
+
+  const placeholders = roleIds.map(() => '?').join(',');
+  const rows = db.db.prepare(`
+    SELECT DISTINCT channel_id, message_id
+    FROM reaction_roles
+    WHERE guild_id = ? AND role_id IN (${placeholders}) AND channel_id != ?
+  `).all(guild.id, ...roleIds, targetChannelId);
+
+  for (const row of rows) {
+    const channel = guild.channels.cache.get(row.channel_id);
+    if (!channel?.messages) continue;
+    const message = await channel.messages.fetch(row.message_id).catch(() => null);
+    if (message?.author?.id === client.user.id) {
+      await message.delete().catch(error => {
+        console.error(`Could not delete legacy language panel in #${channel.name}:`, error.message);
+      });
+    }
+  }
+
+  db.db.prepare(`
+    DELETE FROM reaction_roles
+    WHERE guild_id = ? AND role_id IN (${placeholders}) AND channel_id != ?
+  `).run(guild.id, ...roleIds, targetChannelId);
+
+  if (rows.length) log(`legacy language panels removed: ${rows.length}`);
+}
+
 async function lockExistingArchiveChannels(guild) {
   const archiveChannels = guild.channels.cache.filter(channel => channel.name.startsWith('arquivo-'));
   for (const channel of archiveChannels.values()) {
@@ -486,6 +515,7 @@ async function sendLanguagePanel() {
   const roles = panel.roles
     .map(item => ({ ...item, roleObject: state.roles.get(item.role) }))
     .filter(item => item.roleObject);
+  await cleanupLegacyLanguagePanels(channel.guild, channel.id, roles.map(item => item.roleObject.id));
 
   const embed = new EmbedBuilder()
     .setColor('#5865F2')
@@ -596,7 +626,9 @@ async function ensureInfoMessage(channel, key, embed) {
 }
 
 async function sendInfoMessages(guild) {
+  const startChannel = state.channels.get('start_here');
   const rulesChannel = state.channels.get('rules');
+  const languageChannel = state.channels.get('language_select');
   const faqChannel = state.channels.get('faq');
   const wikiChannel = state.channels.get('wiki');
   const announcementsChannel = state.channels.get('announcements');
@@ -604,7 +636,30 @@ async function sendInfoMessages(guild) {
   const supportChannel = state.channels.get('open_ticket');
   const staffDashboard = state.channels.get('staff_dashboard');
   const shopChannel = state.channels.get('shop');
+  const hallOfFameChannel = state.channels.get('hall_of_fame');
 
+  await ensureInfoMessage(startChannel, 'roguepoke:start:v1', new EmbedBuilder()
+    .setColor('#DCFF00')
+    .setTitle('ROGUEPOKE')
+    .setDescription([
+      '```text',
+      'RRRRR   OOOOO   GGGGG  U   U  EEEEE  PPPPP   OOOOO  K   K  EEEEE',
+      'R   R   O   O   G      U   U  E      P   P   O   O  K  K   E',
+      'RRRRR   O   O   G  GG  U   U  EEEE   PPPPP   O   O  KKK    EEEE',
+      'R  R    O   O   G   G  U   U  E      P       O   O  K  K   E',
+      'R   R   OOOOO   GGGGG  UUUUU  EEEEE  P       OOOOO  K   K  EEEEE',
+      '```',
+      'Bem-vindo(a) ao hub oficial do RoguePoke.',
+      '',
+      '**Primeiros passos:**',
+      '1. Leia #regras.',
+      '2. Libere acesso em #verificacao.',
+      '3. Escolha seus idiomas em #idiomas.',
+      '4. Use #abrir-ticket para suporte privado.',
+      '',
+      'Avisos oficiais ficam em announcements. Idiomas e paises ficam separados para manter anuncios limpos.'
+    ].join('\n'))
+    .setTimestamp());
   await ensureInfoMessage(rulesChannel, 'roguepoke:rules:v2', new EmbedBuilder()
     .setColor('#ED4245')
     .setTitle('📋 Regras Gerais RoguePoke')
@@ -668,6 +723,28 @@ async function sendInfoMessages(guild) {
       '',
       '**Comece por aqui:** leia 📋-regras, registre-se em ✅-verificação e escolha seus idiomas nos botoes abaixo.',
       'Avisos importantes aparecem aqui. Canais oficiais ficam travados para manter informacao limpa.'
+    ].join('\n'))
+    .setTimestamp());
+
+
+  await ensureInfoMessage(languageChannel, 'roguepoke:languages:v1', new EmbedBuilder()
+    .setColor('#5865F2')
+    .setTitle('Idiomas e paises')
+    .setDescription([
+      'Escolha todos os idiomas que voce entende ou quer acompanhar.',
+      '',
+      'Esses cargos servem para identificar voce, liberar os chats certos e aumentar a conversa entre membros de regioes diferentes.',
+      'Voce pode ativar mais de um idioma quando quiser.'
+    ].join('\n'))
+    .setTimestamp());
+
+  await ensureInfoMessage(hallOfFameChannel, 'roguepoke:hof:v1', new EmbedBuilder()
+    .setColor('#F1C40F')
+    .setTitle('Hall of Fame')
+    .setDescription([
+      'Canal para conquistas, runs memoraveis, prints de destaque e feitos da comunidade.',
+      '',
+      'Publique aqui apenas resultados que merecem vitrine. Conversas normais ficam em off-topic ou nos chats de idioma.'
     ].join('\n'))
     .setTimestamp());
 

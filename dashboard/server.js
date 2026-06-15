@@ -536,7 +536,7 @@ function applyCp(userId, amount) {
   return { userId, amount, cp: user.cp };
 }
 
-function awardBadge(userId, badgeKey) {
+async function awardBadge(userId, badgeKey) {
   const guildId = process.env.GUILD_ID;
   const badge = getOne('SELECT key, name FROM badges WHERE key = ?', badgeKey);
   if (!badge) {
@@ -545,8 +545,69 @@ function awardBadge(userId, badgeKey) {
     throw error;
   }
   createUserIfNeeded(userId);
-  db.prepare('INSERT OR IGNORE INTO user_badges (guild_id, user_id, badge_key) VALUES (?, ?, ?)').run(guildId, userId, badgeKey);
-  return { userId, badge };
+  const result = db.prepare('INSERT OR IGNORE INTO user_badges (guild_id, user_id, badge_key) VALUES (?, ?, ?)').run(guildId, userId, badgeKey);
+
+  const roleIds = getBadgeRoleIds(guildId, badgeKey);
+  const assignedRoles = [];
+  const missingRoles = [];
+
+  if (roleIds.length) {
+    const rest = getRestClient();
+    for (const roleId of roleIds) {
+      try {
+        await rest.put(Routes.guildMemberRole(guildId, userId, roleId), {
+          reason: `Badge ${badge.name} entregue pelo dashboard`
+        });
+        assignedRoles.push(roleId);
+      } catch (error) {
+        missingRoles.push({ roleId, error: sanitizeError(error.message) });
+      }
+    }
+  }
+
+  addEventLog({
+    guildId,
+    category: 'economia',
+    eventType: 'badge_awarded',
+    actorId: 'dashboard',
+    targetId: userId,
+    summary: `Badge entregue: ${badge.name}`,
+    details: { badgeKey, inserted: result.changes > 0, assignedRoles, missingRoles }
+  });
+
+  return {
+    userId,
+    badge,
+    inserted: result.changes > 0,
+    assignedRoles,
+    missingRoles,
+    message: assignedRoles.length
+      ? `Badge ${badge.name} entregue e ${assignedRoles.length} cargo(s) aplicados.`
+      : `Badge ${badge.name} entregue no perfil.`
+  };
+}
+
+function getBadgeRoleIds(guildId, badgeKey) {
+  const roleIds = new Set();
+
+  if (tableExists('shop_items')) {
+    const shopItems = getAll("SELECT payload FROM shop_items WHERE guild_id = ? AND type = 'badge'", guildId);
+    for (const item of shopItems) {
+      const payload = safeJSON(item.payload, {});
+      if (payload?.badge?.key === badgeKey && payload.roleId) {
+        roleIds.add(payload.roleId);
+      }
+    }
+  }
+
+  if (tableExists('level_rewards')) {
+    const rewards = getAll('SELECT role_id FROM level_rewards WHERE guild_id = ? AND badge_key = ?', guildId, badgeKey);
+    for (const reward of rewards) {
+      if (reward.role_id) roleIds.add(reward.role_id);
+    }
+  }
+
+  return [...roleIds];
 }
 
 function asyncRoute(handler) {
