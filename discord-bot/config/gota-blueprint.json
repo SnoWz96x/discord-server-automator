@@ -1,0 +1,257 @@
+{
+  "guildId": "1516058483286610002",
+  "name": "Gota D’Água",
+  "description": "Já bebeu água hoje? Uma comunidade pessoal para amigos, conversa, jogos, memes, música e calls.",
+  "roles": [
+    {
+      "key": "owner",
+      "name": "👑 Dono da Gota",
+      "color": "#38BDF8",
+      "permissions": ["Administrator"],
+      "hoist": true
+    },
+    {
+      "key": "staff",
+      "name": "🔱 Guardião da Gota",
+      "color": "#22C55E",
+      "permissions": ["ManageMessages", "ModerateMembers", "KickMembers", "BanMembers"],
+      "hoist": true
+    },
+    {
+      "key": "member",
+      "name": "💧 Gotinha",
+      "color": "#60A5FA",
+      "permissions": []
+    },
+    {
+      "key": "muted",
+      "name": "🔇 Silenciado",
+      "color": "#64748B",
+      "permissions": []
+    },
+    {
+      "key": "gamer",
+      "name": "🎮 Gamer",
+      "color": "#8B5CF6",
+      "permissions": []
+    },
+    {
+      "key": "music",
+      "name": "🎵 Música",
+      "color": "#06B6D4",
+      "permissions": []
+    },
+    {
+      "key": "art",
+      "name": "🎨 Arte",
+      "color": "#F472B6",
+      "permissions": []
+    },
+    {
+      "key": "anime",
+      "name": "📺 Anime",
+      "color": "#A78BFA",
+      "permissions": []
+    },
+    {
+      "key": "memes",
+      "name": "😂 Memes",
+      "color": "#FACC15",
+      "permissions": []
+    },
+    {
+      "key": "social",
+      "name": "💬 Social",
+      "color": "#2DD4BF",
+      "permissions": []
+    },
+    {
+      "key": "night",
+      "name": "🌙 Corujão",
+      "color": "#312E81",
+      "permissions": []
+    },
+    {
+      "key": "events",
+      "name": "📢 Eventos",
+      "color": "#FB923C",
+      "permissions": []
+    },
+    {
+      "key": "giveaways",
+      "name": "🎁 Sorteios",
+      "color": "#F43F5E",
+      "permissions": []
+    },
+    {
+      "key": "live",
+      "name": "🔴 Ping LiveON",
+      "color": "#EF4444",
+      "permissions": []
+    },
+    {
+      "key": "party",
+      "name": "🎮 Ping Jogatina",
+      "color": "#10B981",
+      "permissions": []
+    },
+    {
+      "key": "blue",
+      "name": "🔵 Azul",
+      "color": "#3498DB",
+      "permissions": []
+    },
+    {
+      "key": "lime",
+      "name": "🟢 Verde Limão",
+      "color": "#7BED9F",
+      "permissions": []
+    },
+    {
+      "key": "mint",
+      "name": "🌿 Menta",
+      "color": "#A7F3D0",
+      "permissions": []
+    },
+    {
+      "key": "yellow",
+      "name": "🟡 Amarelo",
+      "color": "#FFFF00",
+      "permissions": []
+    },
+    {
+      "key": "salmon",
+      "name": "🟠 Salmão",
+      "color": "#FF6B6B",
+      "permissions": []
+    },
+    {
+      "key": "cotton",
+      "name": "⚪ Algodão Doce",
+      "color": "#F3D1FF",
+      "permissions": []
+    },
+    {
+      "key": "purple",
+      "name": "🟣 Roxo",
+      "color": "#8E6BE8",
+      "permissions": []
+    },
+    {
+      "key": "orange",
+      "name": "🟧 Laranja",
+      "color": "#FF7F50",
+      "permissions": []
+    },
+    {
+      "key": "red",
+      "name": "🔴 Vermelho",
+      "color": "#FF5555",
+      "permissions": []
+    },
+    {
+      "key": "white",
+      "name": "⚪ Branco",
+      "color": "#FFFFFF",
+      "permissions": []
+    },
+    {
+      "key": "black",
+      "name": "⚫ Preto",
+      "color": "#111111",
+      "permissions": []
+    }
+  ],
+  "categories": [
+    {
+      "name": "【✧】PORTARIA",
+      "channels": [
+        { "key": "welcome", "name": "🚪｜bem-vindo", "type": "text", "locked": true, "topic": "Boas-vindas oficiais do Gota D'Agua." },
+        { "key": "introductions", "name": "🤝｜apresente-se", "type": "text", "topic": "Apresentações dos membros." },
+        { "key": "levels", "name": "📈｜níveis", "type": "text", "locked": true, "topic": "Avisos de level up e progresso." },
+        { "key": "role_pick", "name": "🎭｜cargos", "type": "text", "locked": true, "topic": "Cargos de interesses, notificações e cores." }
+      ]
+    },
+    {
+      "name": "【✧】IMPORTANTE",
+      "channels": [
+        { "key": "rules", "name": "📜｜regras", "type": "text", "locked": true, "topic": "Regras oficiais do servidor." },
+        { "key": "announcements", "name": "📣｜anúncios", "type": "text", "locked": true, "topic": "Avisos importantes do servidor." },
+        { "key": "staff_intro", "name": "🛠️｜conheça-staff", "type": "text", "locked": true, "topic": "Apresentação da staff." },
+        { "key": "roles", "name": "🎨｜aquarela", "type": "text", "locked": true, "topic": "Cores do perfil, interesses e notificações." }
+      ]
+    },
+    {
+      "name": "【✧】NOVIDADES",
+      "channels": [
+        { "key": "live_on", "name": "🔴 — live-on", "type": "text", "locked": true, "topic": "Avisos de live e conteúdo ao vivo." },
+        { "key": "party_ping", "name": "🎮 — chamar-pra-jogar", "type": "text", "topic": "Chame amigos para jogar." },
+        { "key": "starboard", "name": "⭐ — starboard", "type": "text", "locked": true, "topic": "Mensagens favoritas e destaques." },
+        { "key": "events", "name": "📅｜eventos", "type": "text", "locked": true, "topic": "Eventos, noites da gota e programação do servidor." }
+      ]
+    },
+    {
+      "name": "【✧】INTERACOES SOCIAIS",
+      "channels": [
+        { "key": "general", "name": "💬｜chat-geral", "type": "text", "topic": "Conversa geral." },
+        { "key": "chit_chat", "name": "🫧｜bate-papo", "type": "text", "topic": "Conversa leve, rotina e resenha." },
+        { "key": "conversations", "name": "🌙｜conversas", "type": "text", "topic": "Papinhos mais longos, madrugada e assuntos tranquilos." },
+        { "key": "discussions", "name": "☕｜discussões", "type": "forum", "topic": "Tópicos, conversas, jogos e teorias." },
+        { "key": "media", "name": "📷｜mídias", "type": "text", "topic": "Fotos, prints, vídeos e arquivos." },
+        { "key": "commands", "name": "🤖｜comandos", "type": "text", "topic": "Use comandos de bots aqui." },
+        { "key": "memes", "name": "🤣｜memes", "type": "text", "topic": "Memes e zoeira leve." },
+        { "key": "art_channel", "name": "🎨｜arte", "type": "text", "topic": "Desenhos, edits, artes e criações." },
+        { "key": "community_music", "name": "🎵｜música", "type": "text", "topic": "Músicas, playlists e recomendações." },
+        { "key": "questions", "name": "🤔｜perguntas", "type": "forum", "topic": "Perguntas, pedidos de opinião e dúvidas da comunidade." }
+      ]
+    },
+    {
+      "name": "【✧】JOGOS",
+      "channels": [
+        { "key": "looking_party", "name": "🎮｜procurar-party", "type": "text", "topic": "Procure gente para jogar." },
+        { "key": "games_general", "name": "🕹️｜jogos-geral", "type": "text", "topic": "Conversa geral sobre jogos." },
+        { "key": "clips", "name": "⭐｜clipes", "type": "text", "topic": "Clipes, highlights e momentos legais." },
+        { "key": "rankings", "name": "🏆｜rankings", "type": "text", "locked": true, "topic": "Rankings, desafios e destaques dos jogos." },
+        { "key": "game_events", "name": "📅｜eventos-jogos", "type": "text", "locked": true, "topic": "Eventos de jogos e jogatinas marcadas." }
+      ]
+    },
+    {
+      "name": "【✧】CALLS",
+      "channels": [
+        { "key": "no_mic", "name": "🔇｜sem-mic", "type": "text", "topic": "Chat para quem está em call sem microfone." },
+        { "key": "music_request", "name": "🎧｜peça-sua-música", "type": "text", "topic": "Pedidos de música e comandos do bot musical." },
+        { "key": "voice_interface", "name": "✨｜interface", "type": "text", "locked": true, "topic": "Interface e orientações de canais temporários." },
+        { "key": "main_voice", "name": "🔊 Gota Principal", "type": "voice" },
+        { "key": "full_cup", "name": "💧 Copo Cheio", "type": "voice" },
+        { "key": "high_tide", "name": "🌊 Mare Alta", "type": "voice" },
+        { "key": "gaming_voice", "name": "🎮 Jogando", "type": "voice" },
+        { "key": "music_voice", "name": "🎵 Música", "type": "voice" },
+        { "key": "night_voice", "name": "🌙 Corujão", "type": "voice" },
+        { "key": "afk", "name": "😴 AFK", "type": "voice", "afk": true }
+      ]
+    },
+    {
+      "name": "【✧】SUPORTE",
+      "channels": [
+        { "key": "ticket", "name": "🎫｜abrir-ticket", "type": "text", "locked": true, "topic": "Abra tickets para suporte privado." },
+        { "key": "suggestions", "name": "📨｜sugestões", "type": "forum", "topic": "Sugestões para melhorar o servidor." },
+        { "key": "reports", "name": "⚠️｜denúncias", "type": "forum", "topic": "Denúncias e reports com contexto." },
+        { "key": "help", "name": "❓｜ajuda", "type": "text", "topic": "Dúvidas rápidas da comunidade." }
+      ]
+    },
+    {
+      "name": "【✧】STAFF",
+      "staffOnly": true,
+      "channels": [
+        { "key": "staff_chat", "name": "🛡️｜chat-staff", "type": "text", "topic": "Chat privado da staff." },
+        { "key": "logs", "name": "📋｜logs", "type": "text", "topic": "Logs privados do servidor." },
+        { "key": "moderation", "name": "🚨｜moderação", "type": "text", "topic": "Casos, punições e coordenação da moderação." },
+        { "key": "planning", "name": "📌｜planejamento", "type": "text", "topic": "Planejamento de eventos e melhorias." }
+      ]
+    }
+  ],
+  "rolePanels": {
+    "interests": ["gamer", "music", "art", "anime", "memes", "social", "night", "events", "giveaways", "live", "party"],
+    "colors": ["blue", "lime", "mint", "yellow", "salmon", "cotton", "purple", "orange", "red", "white", "black"]
+  }
+}
