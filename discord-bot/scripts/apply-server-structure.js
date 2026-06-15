@@ -686,6 +686,7 @@ async function sendInfoMessages(guild) {
   const staffDashboard = state.channels.get('staff_dashboard');
   const shopChannel = state.channels.get('shop');
   const purchaseHistoryChannel = state.channels.get('purchase_history');
+  const musicChannel = state.channels.get('music');
   const hallOfFameChannel = state.channels.get('hall_of_fame');
 
   await ensureInfoMessage(startChannel, 'roguepoke:start:v1', new EmbedBuilder()
@@ -865,6 +866,25 @@ async function sendInfoMessages(guild) {
       'Use a lojinha para ver o catalogo e `/buy item:<id>` para comprar.'
     ].join('\n'))
     .setTimestamp());
+
+  await ensureInfoMessage(musicChannel, 'roguepoke:music:v1', new EmbedBuilder()
+    .setColor('#5865F2')
+    .setTitle('Rythm no RoguePoke')
+    .setDescription([
+      'Use este canal para pedidos e controles de musica sem misturar com os chats principais.',
+      '',
+      '**Fluxo recomendado:**',
+      '1. Entre em um canal de voz, como 🎧-Rythm.',
+      '2. Use `/play <musica ou link>` para tocar ou adicionar na fila.',
+      '3. Use `/queue`, `/skip` e `/control` para gerenciar a sessao.',
+      '',
+      '**Boas praticas:**',
+      '- Combine a fila com quem estiver no mesmo canal de voz.',
+      '- Use canais temporarios de voz quando quiser uma sessao separada.',
+      '- Staff pode ajustar DJ, volume e anuncios pelo `/settings` do Rythm.'
+    ].join('\n'))
+    .setTimestamp());
+
   await ensureInfoMessage(staffDashboard, 'roguepoke:staff:v1', new EmbedBuilder()
     .setColor('#2DD4BF')
     .setTitle('📊 Staff Ops')

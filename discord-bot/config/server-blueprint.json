@@ -301,6 +301,19 @@
           "memberOnly": true
         },
         {
+          "key": "music",
+          "name": "🎵-musica",
+          "type": "text",
+          "topic": "Pedidos e comandos do Rythm. Entre em voz e use /play, /queue e /control.",
+          "memberOnly": true
+        },
+        {
+          "key": "music_voice",
+          "name": "🎧-Rythm",
+          "type": "voice",
+          "memberOnly": true
+        },
+        {
           "key": "off_topic",
           "name": "💬-off-topic",
           "type": "text",

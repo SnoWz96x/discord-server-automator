@@ -36,7 +36,9 @@ const requiredChannelSuffixes = [
   '-ticket-transcripts',
   '-mod-logs',
   '-lojinha',
-  '-compras'
+  '-compras',
+  '-musica',
+  '-Rythm'
 ];
 
 function assert(condition, message) {
