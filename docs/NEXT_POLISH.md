@@ -14,12 +14,14 @@ This roadmap captures the next improvements that would make the bot and server f
 - Categorized shop with stock and limited-time item support.
 - Forum templates for bugs, suggestions and reports with staff status buttons.
 - Dashboard AutoMod configuration endpoint and UI.
+- Dashboard Discord OAuth2/local auth guard, signed sessions and guild permission checks.
+- Dashboard module settings persistence and editable module cards.
 - GitHub Actions CI, Docker, Compose and environment validation scripts.
 
 ## High Impact
 
-- Add Discord OAuth2 authentication to the dashboard.
-- Add dashboard audit trail for every admin action.
+- Wire persisted dashboard module settings into every runtime bot module.
+- Add dashboard audit browser with before/after payloads.
 - Add scheduled digest posts for open tickets, active bugs and top suggestions.
 - Add dashboard drill-down pages for cases, tickets and quest completion.
 

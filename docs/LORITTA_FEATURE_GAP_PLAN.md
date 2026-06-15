@@ -33,7 +33,7 @@ The goal is not to clone Loritta's identity. The goal is to learn from the produ
 - Moderation commands with case IDs.
 - Tickets with modal intake, status, notes and transcripts.
 - XP, levels, coins, CP, badges and collectible creatures.
-- Dashboard for health, economy, moderation, tickets, logs and AutoMod.
+- Dashboard for health, economy, moderation, tickets, logs, AutoMod, OAuth2 access control and module settings.
 - Feedback forums with templates and status buttons.
 - Shop catalog channel, private purchase flow and public purchase history.
 
@@ -41,9 +41,9 @@ The goal is not to clone Loritta's identity. The goal is to learn from the produ
 
 | Area | Loritta-like capability | Current status | What to implement | Priority |
 | --- | --- | --- | --- | --- |
-| Dashboard | Discord OAuth2 login and server permission checks | Missing | Add Discord OAuth2, sessions, guild selector and permission gate for Admin/ManageGuild | P0 |
-| Dashboard | Per-module settings pages | Partial | Split dashboard into modules: moderation, tickets, economy, XP, AutoMod, welcome, roles, forums | P0 |
-| Dashboard | Audit trail for every action | Partial | Persist dashboard actions with actor, target, payload, before/after and event type | P0 |
+| Dashboard | Discord OAuth2 login and server permission checks | Implemented for configured guild | Add multi-guild selector for installations managing more than one server | P1 |
+| Dashboard | Per-module settings pages | Partial | Connect persisted module settings directly into each runtime module behavior | P0 |
+| Dashboard | Audit trail for every action | Partial | Add before/after payload display and dashboard audit browser | P0 |
 | Moderation | Punishment ladder | Missing | Configure progressive warn -> timeout -> kick/ban by rule type | P0 |
 | Moderation | Case browser and mod history | Partial | Add dashboard case details, filters, reason editing, status, export and appeal state | P0 |
 | Moderation | Appeals | Missing | Add appeal form, review queue, decision log and optional Discord forum/thread integration | P1 |
@@ -76,11 +76,10 @@ The goal is not to clone Loritta's identity. The goal is to learn from the produ
 
 ## Recommended Implementation Order
 
-1. **Dashboard auth and module settings**
-   - Discord OAuth2.
-   - Guild permission checks.
-   - Module pages.
-   - Audit trail.
+1. **Wire module settings into runtime behavior**
+   - Use persisted dashboard settings inside bot modules.
+   - Add before/after audit views.
+   - Add per-module validation.
 
 2. **Profile and economy loop**
    - Visual profile card.
@@ -137,4 +136,4 @@ Every new module should ship with:
 
 ## Next Concrete Build Target
 
-The best next implementation target is **Dashboard OAuth2 + module settings**, because it unlocks safe configuration for everything else. After that, build **visual profile cards + streaks**, because those are the most visible Loritta-like improvements for normal members.
+The best next implementation target is **wiring module settings into runtime behavior**, because the dashboard now stores the settings safely. After that, build **visual profile cards + streaks**, because those are the most visible Loritta-like improvements for normal members.

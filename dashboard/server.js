@@ -1,5 +1,6 @@
 const path = require('path');
 const { execFile } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const { promisify } = require('util');
 const express = require('express');
@@ -13,11 +14,18 @@ const host = process.env.DASHBOARD_HOST || '127.0.0.1';
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '..', 'roguepoke.db');
 const botPath = path.join(__dirname, '..', 'discord-bot', 'index.js').toLowerCase();
 const botPidPath = path.join(__dirname, '..', 'discord-bot', 'bot.pid');
+const sessionSecret = process.env.DASHBOARD_SESSION_SECRET || process.env.DISCORD_TOKEN || 'local-dashboard-secret';
+const dashboardBaseUrl = (process.env.DASHBOARD_PUBLIC_URL || `http://${host}:${port}`).replace(/\/$/, '');
+const oauthRedirectUri = process.env.DISCORD_OAUTH_REDIRECT_URI || `${dashboardBaseUrl}/api/auth/callback`;
+const oauthConfigured = Boolean(process.env.CLIENT_ID && process.env.DISCORD_CLIENT_SECRET);
 const db = new Database(dbPath, { readonly: false });
 const execFileAsync = promisify(execFile);
+const sessions = new Map();
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+initDashboardTables();
 
 function getOne(sql, ...params) {
   return db.prepare(sql).get(...params);
@@ -25,6 +33,30 @@ function getOne(sql, ...params) {
 
 function getAll(sql, ...params) {
   return db.prepare(sql).all(...params);
+}
+
+function initDashboardTables() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS dashboard_module_settings (
+      guild_id TEXT NOT NULL,
+      module_key TEXT NOT NULL,
+      enabled INTEGER DEFAULT 1,
+      settings TEXT DEFAULT '{}',
+      updated_by TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (guild_id, module_key)
+    );
+
+    CREATE TABLE IF NOT EXISTS dashboard_audit (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guild_id TEXT NOT NULL,
+      actor_id TEXT,
+      action TEXT NOT NULL,
+      target TEXT,
+      details TEXT DEFAULT '{}',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 }
 
 function safeJSON(value, fallback) {
@@ -39,6 +71,127 @@ function safeJSON(value, fallback) {
 function tableExists(name) {
   return Boolean(getOne("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", name));
 }
+
+function readCookie(req, name) {
+  const cookieHeader = req.headers.cookie || '';
+  const cookies = Object.fromEntries(cookieHeader.split(';')
+    .map(part => part.trim())
+    .filter(Boolean)
+    .map(part => {
+      const index = part.indexOf('=');
+      return index === -1 ? [part, ''] : [part.slice(0, index), decodeURIComponent(part.slice(index + 1))];
+    }));
+  return cookies[name];
+}
+
+function signValue(value) {
+  return crypto.createHmac('sha256', sessionSecret).update(value).digest('base64url');
+}
+
+function setCookie(res, name, value, options = {}) {
+  const parts = [
+    `${name}=${encodeURIComponent(value)}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax'
+  ];
+  if (options.maxAge) parts.push(`Max-Age=${options.maxAge}`);
+  if (process.env.DASHBOARD_SECURE_COOKIE === 'true') parts.push('Secure');
+  appendSetCookie(res, parts.join('; '));
+}
+
+function clearCookie(res, name) {
+  appendSetCookie(res, `${name}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+}
+
+function appendSetCookie(res, cookie) {
+  const current = res.getHeader('Set-Cookie');
+  if (!current) {
+    res.setHeader('Set-Cookie', cookie);
+    return;
+  }
+  res.setHeader('Set-Cookie', Array.isArray(current) ? [...current, cookie] : [current, cookie]);
+}
+
+function createSignedCookieValue(value) {
+  return `${value}.${signValue(value)}`;
+}
+
+function readSignedCookie(req, name) {
+  const raw = readCookie(req, name);
+  if (!raw || !raw.includes('.')) return null;
+  const [value, signature] = raw.split('.');
+  const expected = signValue(value);
+  try {
+    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
+  } catch (error) {
+    return null;
+  }
+  return value;
+}
+
+function getCurrentSession(req) {
+  if (!oauthConfigured) {
+    return {
+      user: { id: 'local-dashboard', username: 'Local Admin' },
+      guild: { id: process.env.GUILD_ID, name: 'Local guild', owner: true, permissions: '8' },
+      localMode: true
+    };
+  }
+
+  const sessionId = readSignedCookie(req, 'rp_session');
+  if (!sessionId) return null;
+  const session = sessions.get(sessionId);
+  if (!session) return null;
+  if (session.expiresAt < Date.now()) {
+    sessions.delete(sessionId);
+    return null;
+  }
+  return session;
+}
+
+function authSummary(req) {
+  const session = getCurrentSession(req);
+  return {
+    configured: oauthConfigured,
+    authenticated: Boolean(session),
+    user: session?.user || null,
+    guild: session?.guild || null,
+    localMode: Boolean(session?.localMode),
+    loginUrl: '/api/auth/login'
+  };
+}
+
+function requireDashboardAuth(req, res, next) {
+  const session = getCurrentSession(req);
+  if (!session) {
+    res.status(401).json({ error: 'Login Discord necessario.', loginUrl: '/api/auth/login' });
+    return;
+  }
+  req.dashboardSession = session;
+  next();
+}
+
+function hasManageGuildPermission(guild) {
+  if (!guild) return false;
+  if (guild.owner) return true;
+  const permissions = BigInt(guild.permissions || 0);
+  const admin = 0x8n;
+  const manageGuild = 0x20n;
+  return (permissions & admin) === admin || (permissions & manageGuild) === manageGuild;
+}
+
+function publicApiRoute(pathname) {
+  return pathname === '/auth/me'
+    || pathname === '/auth/login'
+    || pathname === '/auth/callback'
+    || pathname === '/auth/logout';
+}
+
+app.use('/api', (req, res, next) => {
+  if (publicApiRoute(req.path)) return next();
+  return requireDashboardAuth(req, res, next);
+});
 
 async function getDiscordHealth() {
   const token = process.env.DISCORD_TOKEN;
@@ -258,6 +411,222 @@ function saveAutomodRule(ruleName, body) {
   return { ruleName, enabled: Boolean(body.enabled), config };
 }
 
+const moduleDefinitions = [
+  {
+    key: 'welcome',
+    name: 'Boas-vindas',
+    description: 'Mensagem publica de entrada, DM opcional e canal de welcome.',
+    settings: { channelId: '', dmEnabled: false, messageStyle: 'embed' }
+  },
+  {
+    key: 'verification',
+    name: 'Registro',
+    description: 'Painel de verificacao, cargo de membro e limpeza visual do onboarding.',
+    settings: { channelId: '', memberRoleId: '', ephemeralCompletion: true }
+  },
+  {
+    key: 'languages',
+    name: 'Idiomas',
+    description: 'Cargos de idioma/pais para liberar chats regionais sem poluir anuncios.',
+    settings: { channelId: '', allowMultiple: true }
+  },
+  {
+    key: 'tickets',
+    name: 'Tickets',
+    description: 'Suporte privado com intake, prioridade, status, notes e transcripts.',
+    settings: { channelId: '', slaHours: 24, requireModal: true }
+  },
+  {
+    key: 'leveling',
+    name: 'XP e niveis',
+    description: 'Progressao por mensagem e recompensas de atividade.',
+    settings: { xpMin: 15, xpMax: 25, cooldownMs: 60000 }
+  },
+  {
+    key: 'economy',
+    name: 'Economia',
+    description: 'PokeCoins, CP, daily, weekly, work e loja.',
+    settings: { currency: 'PokeCoins', dailyReward: 100, weeklyReward: 500 }
+  },
+  {
+    key: 'shop',
+    name: 'Lojinha',
+    description: 'Catalogo travado, respostas privadas e historico publico de compras.',
+    settings: { catalogChannelId: '', historyChannelId: '', ephemeralCommands: true }
+  },
+  {
+    key: 'automod',
+    name: 'AutoMod',
+    description: 'Spam, convites, links, caps, palavras bloqueadas e whitelist.',
+    settings: { progressivePunishment: false, reviewQueue: false }
+  },
+  {
+    key: 'modlogs',
+    name: 'Logs de staff',
+    description: 'Eventos separados por cadastro, moderacao, tickets, economia e canais.',
+    settings: { channelId: '', splitByEvent: true }
+  },
+  {
+    key: 'forums',
+    name: 'Forums',
+    description: 'Bugs, sugestoes e reports como postagens com templates e status.',
+    settings: { autoTemplate: true, statusButtons: true }
+  }
+];
+
+function getDefaultModuleSettings(guildId) {
+  const configs = getOverview().configs || {};
+  return {
+    welcome: {
+      enabled: Boolean(configs.welcome?.enabled),
+      settings: {
+        channelId: configs.welcome?.channel_id || '',
+        dmEnabled: Boolean(configs.welcome?.dm_enabled),
+        messageStyle: 'embed'
+      }
+    },
+    verification: {
+      enabled: Boolean(configs.verification?.enabled),
+      settings: {
+        channelId: configs.verification?.channel_id || '',
+        memberRoleId: configs.verification?.role_id || '',
+        ephemeralCompletion: true
+      }
+    },
+    languages: {
+      enabled: true,
+      settings: { channelId: '', allowMultiple: true }
+    },
+    tickets: {
+      enabled: Boolean(configs.ticket?.enabled),
+      settings: {
+        channelId: configs.ticket?.channel_id || '',
+        slaHours: 24,
+        requireModal: true
+      }
+    },
+    leveling: {
+      enabled: Boolean(configs.leveling?.enabled),
+      settings: {
+        xpMin: configs.leveling?.xp_min || 15,
+        xpMax: configs.leveling?.xp_max || 25,
+        cooldownMs: configs.leveling?.cooldown || 60000
+      }
+    },
+    economy: {
+      enabled: Boolean(configs.economy?.enabled),
+      settings: {
+        currency: configs.economy?.currency || 'PokeCoins',
+        dailyReward: configs.economy?.daily_reward || 100,
+        weeklyReward: configs.economy?.weekly_reward || 500
+      }
+    },
+    shop: {
+      enabled: true,
+      settings: { catalogChannelId: '', historyChannelId: '', ephemeralCommands: true }
+    },
+    automod: {
+      enabled: true,
+      settings: { progressivePunishment: false, reviewQueue: false }
+    },
+    modlogs: {
+      enabled: true,
+      settings: { channelId: '', splitByEvent: true }
+    },
+    forums: {
+      enabled: true,
+      settings: { autoTemplate: true, statusButtons: true }
+    }
+  };
+}
+
+function getModuleSettings() {
+  const guildId = process.env.GUILD_ID;
+  const defaults = getDefaultModuleSettings(guildId);
+  const rows = getAll('SELECT * FROM dashboard_module_settings WHERE guild_id = ?', guildId);
+  const overrides = Object.fromEntries(rows.map(row => [row.module_key, row]));
+
+  return moduleDefinitions.map(definition => {
+    const base = defaults[definition.key] || { enabled: true, settings: definition.settings };
+    const override = overrides[definition.key];
+    const settings = override
+      ? { ...definition.settings, ...base.settings, ...safeJSON(override.settings, {}) }
+      : { ...definition.settings, ...base.settings };
+
+    return {
+      ...definition,
+      enabled: override ? Boolean(override.enabled) : Boolean(base.enabled),
+      settings,
+      updatedBy: override?.updated_by || null,
+      updatedAt: override?.updated_at || null
+    };
+  });
+}
+
+function sanitizeModuleSettings(settings) {
+  const output = {};
+  for (const [key, value] of Object.entries(settings || {})) {
+    if (!/^[a-zA-Z0-9_]+$/.test(key)) continue;
+    if (typeof value === 'boolean') output[key] = value;
+    else if (typeof value === 'number') output[key] = Number.isFinite(value) ? value : 0;
+    else output[key] = String(value || '').slice(0, 500);
+  }
+  return output;
+}
+
+function saveModuleSettings(moduleKey, body, actorId = 'dashboard') {
+  const guildId = process.env.GUILD_ID;
+  const definition = moduleDefinitions.find(item => item.key === moduleKey);
+  if (!definition) {
+    const error = new Error('Modulo invalido.');
+    error.status = 400;
+    throw error;
+  }
+
+  const current = getModuleSettings().find(item => item.key === moduleKey);
+  const settings = sanitizeModuleSettings({ ...current.settings, ...(body.settings || {}) });
+  const enabled = body.enabled === false || body.enabled === 'false' ? 0 : 1;
+
+  db.prepare(`
+    INSERT INTO dashboard_module_settings (guild_id, module_key, enabled, settings, updated_by, updated_at)
+    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(guild_id, module_key)
+    DO UPDATE SET enabled = excluded.enabled,
+                  settings = excluded.settings,
+                  updated_by = excluded.updated_by,
+                  updated_at = CURRENT_TIMESTAMP
+  `).run(guildId, moduleKey, enabled, JSON.stringify(settings), actorId);
+
+  addDashboardAudit({
+    action: 'module_settings_updated',
+    target: moduleKey,
+    actorId,
+    details: { enabled: Boolean(enabled), settings }
+  });
+
+  return getModuleSettings().find(item => item.key === moduleKey);
+}
+
+function addDashboardAudit({ action, target, actorId = null, details = {} }) {
+  const guildId = process.env.GUILD_ID || 'unknown';
+  const audit = db.prepare(`
+    INSERT INTO dashboard_audit (guild_id, actor_id, action, target, details)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(guildId, actorId, action, target, JSON.stringify(details || {}));
+
+  addEventLog({
+    guildId,
+    category: 'dashboard',
+    eventType: action,
+    actorId,
+    targetId: target,
+    summary: `Dashboard: ${action} em ${target}`,
+    details
+  });
+
+  return audit;
+}
+
 function nextCaseNumber(guildId) {
   return Number(getOne('SELECT COALESCE(MAX(case_number), 0) + 1 as next FROM moderation WHERE guild_id = ?', guildId)?.next || 1);
 }
@@ -450,7 +819,7 @@ function getAdminOptions() {
   };
 }
 
-async function applyModerationAction({ action, userId, reason, durationMinutes }) {
+async function applyModerationAction({ action, userId, reason, durationMinutes, actorId = 'dashboard' }) {
   requireDiscordEnv();
   const guildId = process.env.GUILD_ID;
   const rest = getRestClient();
@@ -459,7 +828,7 @@ async function applyModerationAction({ action, userId, reason, durationMinutes }
   if (action === 'warn') {
     db.prepare('INSERT OR IGNORE INTO users (id, guild_id, username) VALUES (?, ?, ?)').run(userId, guildId, '');
     db.prepare('UPDATE users SET warnings = warnings + 1 WHERE id = ? AND guild_id = ?').run(userId, guildId);
-    const modCase = addModerationCase({ guildId, userId, moderatorId: 'dashboard', action: 'warn', reason: cleanReason });
+    const modCase = addModerationCase({ guildId, userId, moderatorId: actorId, action: 'warn', reason: cleanReason });
     return { action, userId, caseId: modCase.case_id, message: `Warning registrado (${modCase.case_id}).` };
   }
 
@@ -468,13 +837,13 @@ async function applyModerationAction({ action, userId, reason, durationMinutes }
       body: { delete_message_seconds: 0 },
       reason: cleanReason
     });
-    const modCase = addModerationCase({ guildId, userId, moderatorId: 'dashboard', action: 'ban', reason: cleanReason });
+    const modCase = addModerationCase({ guildId, userId, moderatorId: actorId, action: 'ban', reason: cleanReason });
     return { action, userId, caseId: modCase.case_id, message: `Usuario banido (${modCase.case_id}).` };
   }
 
   if (action === 'kick') {
     await rest.delete(Routes.guildMember(guildId, userId), { reason: cleanReason });
-    const modCase = addModerationCase({ guildId, userId, moderatorId: 'dashboard', action: 'kick', reason: cleanReason });
+    const modCase = addModerationCase({ guildId, userId, moderatorId: actorId, action: 'kick', reason: cleanReason });
     return { action, userId, caseId: modCase.case_id, message: `Usuario expulso (${modCase.case_id}).` };
   }
 
@@ -485,7 +854,7 @@ async function applyModerationAction({ action, userId, reason, durationMinutes }
       body: { communication_disabled_until: until },
       reason: cleanReason
     });
-    const modCase = addModerationCase({ guildId, userId, moderatorId: 'dashboard', action: 'timeout', reason: cleanReason, duration: minutes * 60000 });
+    const modCase = addModerationCase({ guildId, userId, moderatorId: actorId, action: 'timeout', reason: cleanReason, duration: minutes * 60000 });
     return { action, userId, caseId: modCase.case_id, message: `Timeout aplicado por ${minutes} minuto(s) (${modCase.case_id}).` };
   }
 
@@ -494,7 +863,7 @@ async function applyModerationAction({ action, userId, reason, durationMinutes }
       body: { communication_disabled_until: null },
       reason: cleanReason
     });
-    const modCase = addModerationCase({ guildId, userId, moderatorId: 'dashboard', action: 'untimeout', reason: cleanReason });
+    const modCase = addModerationCase({ guildId, userId, moderatorId: actorId, action: 'untimeout', reason: cleanReason });
     return { action, userId, caseId: modCase.case_id, message: `Timeout removido (${modCase.case_id}).` };
   }
 
@@ -536,7 +905,7 @@ function applyCp(userId, amount) {
   return { userId, amount, cp: user.cp };
 }
 
-async function awardBadge(userId, badgeKey) {
+async function awardBadge(userId, badgeKey, actorId = 'dashboard') {
   const guildId = process.env.GUILD_ID;
   const badge = getOne('SELECT key, name FROM badges WHERE key = ?', badgeKey);
   if (!badge) {
@@ -569,7 +938,7 @@ async function awardBadge(userId, badgeKey) {
     guildId,
     category: 'economia',
     eventType: 'badge_awarded',
-    actorId: 'dashboard',
+    actorId,
     targetId: userId,
     summary: `Badge entregue: ${badge.name}`,
     details: { badgeKey, inserted: result.changes > 0, assignedRoles, missingRoles }
@@ -621,6 +990,134 @@ function asyncRoute(handler) {
   };
 }
 
+app.get('/api/auth/me', (req, res) => {
+  res.json(authSummary(req));
+});
+
+app.get('/api/auth/login', (req, res) => {
+  if (!oauthConfigured) {
+    res.redirect('/');
+    return;
+  }
+
+  const state = crypto.randomBytes(24).toString('base64url');
+  setCookie(res, 'rp_oauth_state', createSignedCookieValue(state), { maxAge: 600 });
+
+  const params = new URLSearchParams({
+    client_id: process.env.CLIENT_ID,
+    redirect_uri: oauthRedirectUri,
+    response_type: 'code',
+    scope: 'identify guilds',
+    state,
+    prompt: 'none'
+  });
+
+  res.redirect(`https://discord.com/oauth2/authorize?${params.toString()}`);
+});
+
+app.get('/api/auth/logout', (req, res) => {
+  const sessionId = readSignedCookie(req, 'rp_session');
+  if (sessionId) sessions.delete(sessionId);
+  clearCookie(res, 'rp_session');
+  res.redirect('/');
+});
+
+app.get('/api/auth/callback', asyncRoute(async (req, res) => {
+  if (!oauthConfigured) {
+    res.redirect('/');
+    return null;
+  }
+
+  const state = String(req.query.state || '');
+  const expectedState = readSignedCookie(req, 'rp_oauth_state');
+  clearCookie(res, 'rp_oauth_state');
+  if (!state || !expectedState || state !== expectedState) {
+    const error = new Error('Estado OAuth invalido. Tente fazer login novamente.');
+    error.status = 400;
+    throw error;
+  }
+
+  const code = String(req.query.code || '');
+  if (!code) {
+    const error = new Error('Codigo OAuth ausente.');
+    error.status = 400;
+    throw error;
+  }
+
+  const tokenResponse = await fetch('https://discord.com/api/oauth2/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: process.env.CLIENT_ID,
+      client_secret: process.env.DISCORD_CLIENT_SECRET,
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: oauthRedirectUri
+    })
+  });
+
+  if (!tokenResponse.ok) {
+    const error = new Error('Discord recusou o login OAuth.');
+    error.status = 401;
+    throw error;
+  }
+
+  const token = await tokenResponse.json();
+  const [userResponse, guildsResponse] = await Promise.all([
+    fetch('https://discord.com/api/users/@me', {
+      headers: { Authorization: `${token.token_type} ${token.access_token}` }
+    }),
+    fetch('https://discord.com/api/users/@me/guilds', {
+      headers: { Authorization: `${token.token_type} ${token.access_token}` }
+    })
+  ]);
+
+  if (!userResponse.ok || !guildsResponse.ok) {
+    const error = new Error('Nao foi possivel carregar sua conta Discord.');
+    error.status = 401;
+    throw error;
+  }
+
+  const user = await userResponse.json();
+  const guilds = await guildsResponse.json();
+  const guild = guilds.find(item => item.id === process.env.GUILD_ID);
+
+  if (!hasManageGuildPermission(guild)) {
+    const error = new Error('Sua conta precisa ter Administrador ou Gerenciar Servidor neste guild.');
+    error.status = 403;
+    throw error;
+  }
+
+  const sessionId = crypto.randomBytes(32).toString('base64url');
+  sessions.set(sessionId, {
+    user: {
+      id: user.id,
+      username: user.global_name || user.username,
+      avatar: user.avatar
+    },
+    guild: {
+      id: guild.id,
+      name: guild.name,
+      icon: guild.icon,
+      owner: Boolean(guild.owner),
+      permissions: guild.permissions
+    },
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 1000 * 60 * 60 * 12
+  });
+
+  setCookie(res, 'rp_session', createSignedCookieValue(sessionId), { maxAge: 60 * 60 * 12 });
+  addDashboardAudit({
+    action: 'dashboard_login',
+    target: 'session',
+    actorId: user.id,
+    details: { username: user.username, guildId: guild.id }
+  });
+
+  res.redirect('/');
+  return null;
+}));
+
 app.get('/api/health', async (req, res) => {
   const [discord, processHealth] = await Promise.all([getDiscordHealth(), getProcessHealth()]);
   res.json({ ...discord, process: processHealth });
@@ -660,37 +1157,93 @@ app.get('/api/automod', (req, res) => {
   res.json(getAutomodConfig());
 });
 
+app.get('/api/modules/settings', (req, res) => {
+  res.json({ modules: getModuleSettings() });
+});
+
+app.post('/api/modules/settings/:moduleKey', asyncRoute(async (req) => {
+  const actorId = req.dashboardSession?.user?.id || 'dashboard';
+  return saveModuleSettings(String(req.params.moduleKey || ''), req.body, actorId);
+}));
+
 app.get('/api/admin/options', (req, res) => {
   res.json(getAdminOptions());
 });
 
 app.post('/api/admin/moderation', asyncRoute(async (req) => {
-  return applyModerationAction({
+  const result = await applyModerationAction({
     action: String(req.body.action || '').trim(),
     userId: requireUserId(req.body.userId),
     reason: req.body.reason,
-    durationMinutes: req.body.durationMinutes
+    durationMinutes: req.body.durationMinutes,
+    actorId: req.dashboardSession?.user?.id || 'dashboard'
   });
+  addDashboardAudit({
+    action: 'admin_moderation',
+    target: result.userId,
+    actorId: req.dashboardSession?.user?.id || 'dashboard',
+    details: result
+  });
+  return result;
 }));
 
 app.post('/api/admin/xp', asyncRoute(async (req) => {
-  return applyXp(requireUserId(req.body.userId), safeAmount(req.body.amount));
+  const result = applyXp(requireUserId(req.body.userId), safeAmount(req.body.amount));
+  addDashboardAudit({
+    action: 'admin_xp_adjusted',
+    target: result.userId,
+    actorId: req.dashboardSession?.user?.id || 'dashboard',
+    details: result
+  });
+  return result;
 }));
 
 app.post('/api/admin/coins', asyncRoute(async (req) => {
-  return applyCoins(requireUserId(req.body.userId), safeAmount(req.body.amount));
+  const result = applyCoins(requireUserId(req.body.userId), safeAmount(req.body.amount));
+  addDashboardAudit({
+    action: 'admin_coins_adjusted',
+    target: result.userId,
+    actorId: req.dashboardSession?.user?.id || 'dashboard',
+    details: result
+  });
+  return result;
 }));
 
 app.post('/api/admin/cp', asyncRoute(async (req) => {
-  return applyCp(requireUserId(req.body.userId), safeAmount(req.body.amount));
+  const result = applyCp(requireUserId(req.body.userId), safeAmount(req.body.amount));
+  addDashboardAudit({
+    action: 'admin_cp_adjusted',
+    target: result.userId,
+    actorId: req.dashboardSession?.user?.id || 'dashboard',
+    details: result
+  });
+  return result;
 }));
 
 app.post('/api/admin/badges', asyncRoute(async (req) => {
-  return awardBadge(requireUserId(req.body.userId), String(req.body.badgeKey || '').trim());
+  const result = await awardBadge(
+    requireUserId(req.body.userId),
+    String(req.body.badgeKey || '').trim(),
+    req.dashboardSession?.user?.id || 'dashboard'
+  );
+  addDashboardAudit({
+    action: 'admin_badge_awarded',
+    target: result.userId,
+    actorId: req.dashboardSession?.user?.id || 'dashboard',
+    details: { badgeKey: result.badge.key, assignedRoles: result.assignedRoles, inserted: result.inserted }
+  });
+  return result;
 }));
 
 app.post('/api/admin/automod', asyncRoute(async (req) => {
-  return saveAutomodRule(String(req.body.ruleName || ''), req.body);
+  const result = saveAutomodRule(String(req.body.ruleName || ''), req.body);
+  addDashboardAudit({
+    action: 'admin_automod_updated',
+    target: result.ruleName,
+    actorId: req.dashboardSession?.user?.id || 'dashboard',
+    details: result
+  });
+  return result;
 }));
 
 app.get('/api/logs', (req, res) => {

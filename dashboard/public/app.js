@@ -6,7 +6,9 @@ const state = {
   badges: null,
   shop: null,
   automod: null,
-  logs: null
+  logs: null,
+  modules: null,
+  auth: null
 };
 
 const currency = new Intl.NumberFormat('pt-BR');
@@ -21,6 +23,12 @@ function $(id) {
 
 async function fetchJSON(url) {
   const response = await fetch(url);
+  if (response.status === 401) {
+    const payload = await response.json().catch(() => ({}));
+    const error = new Error(payload.error || 'Login necessario.');
+    error.status = 401;
+    throw error;
+  }
   if (!response.ok) throw new Error(`Request failed: ${url}`);
   return response.json();
 }
@@ -48,8 +56,29 @@ function formatDate(value) {
   return dateTime.format(date);
 }
 
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  })[char]);
+}
+
 function userLabel(row) {
   return row.username || row.id || 'Unknown user';
+}
+
+function renderAuth(auth) {
+  state.auth = auth;
+  const locked = !auth.authenticated;
+  $('authGate')?.classList.toggle('hidden', !locked);
+  document.body.classList.toggle('locked', locked);
+
+  setText('authUser', auth.user ? auth.user.username : 'Nao conectado');
+  const logout = $('logoutLink');
+  if (logout) logout.classList.toggle('hidden', Boolean(auth.localMode) || !auth.authenticated);
 }
 
 function renderHealth(data) {
@@ -111,6 +140,65 @@ function renderOverview(data) {
       </div>
     `;
   }).join('');
+}
+
+function renderModuleSettings(data) {
+  const target = $('moduleSettingsGrid');
+  if (!target) return;
+
+  const modules = data?.modules || [];
+  if (!modules.length) {
+    target.innerHTML = '<div class="empty">Nenhum modulo configuravel encontrado.</div>';
+    return;
+  }
+
+  target.innerHTML = modules.map(module => {
+    const settings = Object.entries(module.settings || {});
+    return `
+      <form class="module-settings-card" data-module-key="${escapeHTML(module.key)}">
+        <div class="module-settings-head">
+          <div>
+            <strong>${escapeHTML(module.name)}</strong>
+            <span>${escapeHTML(module.description)}</span>
+          </div>
+          <label class="toggle-row">
+            <input type="checkbox" name="enabled" ${module.enabled ? 'checked' : ''} />
+            <span>${module.enabled ? 'Ativo' : 'Inativo'}</span>
+          </label>
+        </div>
+        <div class="module-fields">
+          ${settings.map(([key, value]) => renderModuleField(key, value)).join('')}
+        </div>
+        <div class="module-settings-footer">
+          <small>${module.updatedAt ? `Atualizado ${formatDate(module.updatedAt)} por ${escapeHTML(module.updatedBy || '-')}` : 'Usando configuracao padrao'}</small>
+          <button type="submit">Salvar</button>
+        </div>
+      </form>
+    `;
+  }).join('');
+}
+
+function renderModuleField(key, value) {
+  const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, char => char.toUpperCase());
+  if (typeof value === 'boolean') {
+    return `
+      <label>
+        <span>${escapeHTML(label)}</span>
+        <select name="settings.${escapeHTML(key)}">
+          <option value="true" ${value ? 'selected' : ''}>Sim</option>
+          <option value="false" ${!value ? 'selected' : ''}>Nao</option>
+        </select>
+      </label>
+    `;
+  }
+
+  const type = typeof value === 'number' ? 'number' : 'text';
+  return `
+    <label>
+      <span>${escapeHTML(label)}</span>
+      <input name="settings.${escapeHTML(key)}" type="${type}" value="${escapeHTML(value)}" />
+    </label>
+  `;
 }
 
 function renderLeaderboard(data) {
@@ -312,7 +400,7 @@ async function refresh() {
   $('refreshBtn').textContent = 'Atualizando...';
 
   try {
-    const [overview, leaderboard, moderation, tickets, badges, shop, automod, logs] = await Promise.all([
+    const [overview, leaderboard, moderation, tickets, badges, shop, automod, logs, modules] = await Promise.all([
       fetchJSON('/api/overview'),
       fetchJSON('/api/leaderboard'),
       fetchJSON('/api/moderation'),
@@ -320,7 +408,8 @@ async function refresh() {
       fetchJSON('/api/badges'),
       fetchJSON('/api/shop'),
       fetchJSON('/api/automod'),
-      fetchJSON('/api/logs')
+      fetchJSON('/api/logs'),
+      fetchJSON('/api/modules/settings')
     ]);
 
     state.overview = overview;
@@ -331,6 +420,7 @@ async function refresh() {
     state.shop = shop;
     state.automod = automod;
     state.logs = logs;
+    state.modules = modules;
 
     renderHealth(overview);
     renderOverview(overview);
@@ -342,10 +432,15 @@ async function refresh() {
     renderAutomod(automod);
     renderLogs(logs);
     renderAdminOptions(badges);
+    renderModuleSettings(modules);
 
     setText('lastUpdated', `Atualizado ${dateTime.format(new Date())}`);
   } catch (error) {
     console.error(error);
+    if (error.status === 401) {
+      renderAuth({ configured: true, authenticated: false, loginUrl: '/api/auth/login' });
+      return;
+    }
     const badge = $('botBadge');
     badge.textContent = 'Erro';
     badge.className = 'badge bad';
@@ -402,10 +497,61 @@ $('automodForm')?.addEventListener('submit', event => {
     .catch(error => setAdminResult(error.message, 'bad'));
 });
 
+$('moduleSettingsGrid')?.addEventListener('submit', event => {
+  event.preventDefault();
+  const form = event.target.closest('form[data-module-key]');
+  if (!form) return;
+
+  const moduleKey = form.dataset.moduleKey;
+  const values = formValues(form);
+  const settings = {};
+  for (const [key, value] of Object.entries(values)) {
+    if (!key.startsWith('settings.')) continue;
+    const settingKey = key.slice('settings.'.length);
+    settings[settingKey] = parseModuleValue(value);
+  }
+
+  setText('moduleResult', 'Salvando...');
+  $('moduleResult').className = 'badge neutral';
+  postJSON(`/api/modules/settings/${moduleKey}`, {
+    enabled: form.querySelector('[name="enabled"]')?.checked === true,
+    settings
+  })
+    .then(() => {
+      setText('moduleResult', 'Modulo salvo.');
+      $('moduleResult').className = 'badge ok';
+      return refresh();
+    })
+    .catch(error => {
+      setText('moduleResult', error.message);
+      $('moduleResult').className = 'badge bad';
+    });
+});
+
+function parseModuleValue(value) {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  if (/^-?\d+(\.\d+)?$/.test(String(value || '').trim())) return Number(value);
+  return value;
+}
+
 function parseAutomodValue(value) {
   if (/^-?\d+$/.test(String(value || '').trim())) return Number(value);
   return value;
 }
 
-refresh();
-setInterval(refresh, 30000);
+async function init() {
+  try {
+    const auth = await fetchJSON('/api/auth/me');
+    renderAuth(auth);
+    if (auth.authenticated) {
+      await refresh();
+      setInterval(refresh, 30000);
+    }
+  } catch (error) {
+    console.error(error);
+    renderAuth({ configured: true, authenticated: false, loginUrl: '/api/auth/login' });
+  }
+}
+
+init();

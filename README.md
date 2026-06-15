@@ -113,6 +113,10 @@ GUILD_ID=your_test_guild_id_here
 OWNER_USER_ID=your_discord_user_id_here
 DASHBOARD_HOST=127.0.0.1
 DASHBOARD_PORT=3000
+DASHBOARD_PUBLIC_URL=http://127.0.0.1:3000
+DASHBOARD_SESSION_SECRET=change_me_to_a_long_random_string
+DISCORD_CLIENT_SECRET=your_discord_application_client_secret_here
+DISCORD_OAUTH_REDIRECT_URI=http://127.0.0.1:3000/api/auth/callback
 ```
 
 Never commit `.env`, local databases, logs or PID files.
@@ -273,6 +277,7 @@ Customize:
 The dashboard currently provides:
 
 - bot/API/process health;
+- Discord OAuth2 login with server permission checks;
 - registered command count;
 - channel count;
 - XP, coins and CP stats;
@@ -282,15 +287,22 @@ The dashboard currently provides:
 - AutoMod configuration;
 - shop overview;
 - badge overview;
-- admin actions.
+- admin actions;
+- module settings for welcome, verification, languages, tickets, leveling, economy, shop, AutoMod, logs and forums.
 
-Keep the dashboard local until authentication is implemented.
+When `DISCORD_CLIENT_SECRET` is not set, the dashboard runs in local admin mode for development. For a public or shared dashboard, configure OAuth2 in the Discord Developer Portal and add this redirect URL:
+
+```text
+http://127.0.0.1:3000/api/auth/callback
+```
+
+Use your production domain in `DASHBOARD_PUBLIC_URL` and `DISCORD_OAUTH_REDIRECT_URI` when deploying.
 
 ## Security
 
 - Do not commit `.env`.
 - Do not commit local SQLite databases.
-- Do not expose the dashboard publicly without OAuth2/session auth.
+- Do not expose the dashboard publicly without `DISCORD_CLIENT_SECRET`, `DASHBOARD_SESSION_SECRET` and a correct OAuth2 redirect URI.
 - Review bot permissions before using Administrator in production.
 - Rotate tokens if they are ever exposed.
 

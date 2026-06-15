@@ -27,6 +27,8 @@ npm --prefix discord-bot run test:system
 - Creatures seeded: 5.
 - Badges seeded: 11.
 - Dashboard health endpoint: online.
+- Dashboard OAuth/local auth endpoint: online.
+- Dashboard module settings endpoint: online.
 
 ## Smoke Test Coverage
 
@@ -55,6 +57,7 @@ npm --prefix discord-bot run test:system
 
 - Dashboard rendered through Playwright.
 - Dashboard screenshots generated.
+- Dashboard module settings rendered through Playwright.
 - Bot process online.
 - Discord API responded.
 - Server setup script applied successfully.
@@ -64,6 +67,7 @@ npm --prefix discord-bot run test:system
 
 ## Known Gaps
 
-- Dashboard authentication is not implemented yet.
+- Dashboard OAuth2 is implemented for one configured guild; multi-guild selector is not implemented yet.
+- Dashboard module settings are persisted; not every bot runtime module consumes them yet.
 - Marketplace between users is not implemented yet.
 - Creature evolution and scheduled events are not implemented yet.

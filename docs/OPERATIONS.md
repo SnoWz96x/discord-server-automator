@@ -29,9 +29,10 @@ It shows:
 - XP, coins and CP rankings;
 - configured and awarded badges;
 - shop and collectible creature status;
-- admin actions for trusted local operators.
+- admin actions for trusted operators;
+- module settings for welcome, verification, languages, tickets, leveling, economy, shop, AutoMod, logs and forums.
 
-Keep the dashboard local until OAuth2/session authentication is implemented.
+If `DISCORD_CLIENT_SECRET` is configured, the dashboard requires Discord OAuth2 and only allows users with Administrator or Manage Server in the configured guild. Without OAuth2 variables it runs in local admin mode for development only.
 
 ## Safe Setup Flow
 

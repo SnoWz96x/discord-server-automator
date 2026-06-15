@@ -7,6 +7,16 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <section id="authGate" class="auth-gate hidden">
+      <div class="auth-panel">
+        <div class="brand-mark">RP</div>
+        <p class="eyebrow">Dashboard protegido</p>
+        <h1>Entrar com Discord</h1>
+        <p>Use uma conta com Administrador ou Gerenciar Servidor no guild configurado.</p>
+        <a class="button-link" href="/api/auth/login">Conectar Discord</a>
+      </div>
+    </section>
+
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark">RP</div>
@@ -45,6 +55,8 @@
           <h1>Operacao do bot</h1>
         </div>
         <div class="toolbar">
+          <span id="authUser" class="auth-user">Local Admin</span>
+          <a id="logoutLink" class="logout-link" href="/api/auth/logout">Sair</a>
           <button id="refreshBtn" type="button">Atualizar</button>
           <span id="lastUpdated">Nunca atualizado</span>
         </div>
@@ -367,10 +379,12 @@
         <div class="panel-head">
           <div>
             <p class="eyebrow">Configuracao</p>
-            <h2>Modulos ativos</h2>
+            <h2>Configuracao por modulo</h2>
           </div>
+          <span id="moduleResult" class="badge neutral">Pronto</span>
         </div>
         <div id="moduleGrid" class="module-grid"></div>
+        <div id="moduleSettingsGrid" class="module-settings-grid"></div>
       </section>
     </main>
 
