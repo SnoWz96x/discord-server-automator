@@ -747,7 +747,7 @@ async function sendInfoMessages(guild) {
       'Uma comunidade para um novo jogo de aventura/roguelike com criaturas, progresso, runs, descobertas e estrategia.',
       '',
       '**Como libero os canais?**',
-      'Use o botao em ✅-verificação e depois escolha seus idiomas em 📢-announcements.',
+      'Use o botao em ✅-verificação e depois escolha seus idiomas em \uD83C\uDF10-idiomas.',
       '',
       '**Onde reporto bugs?**',
       'Use 🐛-bugs-and-ideas para reports publicos. Abra ticket se envolver conta, exploit sensivel ou dados privados.',
@@ -767,7 +767,7 @@ async function sendInfoMessages(guild) {
       '**Fluxo recomendado para novos membros:**',
       '1. Leia 📋-regras.',
       '2. Registre-se em ✅-verificação.',
-      '3. Escolha Português, English ou Español em 📢-announcements.',
+      '3. Escolha Portugues, English ou Espanol em \uD83C\uDF10-idiomas.',
       '4. Converse no canal do seu idioma.',
       '5. Use 💡-dicas, ⚔️-builds e 🧬-bestiário para conhecimento do jogo.',
       '',
@@ -782,7 +782,7 @@ async function sendInfoMessages(guild) {
     .setDescription([
       'Este servidor foi organizado para novidades, suporte, feedback, runs e moderacao clara.',
       '',
-      '**Comece por aqui:** leia 📋-regras, registre-se em ✅-verificação e escolha seus idiomas nos botoes abaixo.',
+      '**Comece por aqui:** leia 📋-regras, registre-se em ✅-verificação e escolha seus idiomas em \uD83C\uDF10-idiomas.',
       'Avisos importantes aparecem aqui. Canais oficiais ficam travados para manter informacao limpa.'
     ].join('\n'))
     .setTimestamp());

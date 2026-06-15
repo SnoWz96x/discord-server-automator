@@ -44,7 +44,7 @@ module.exports = {
       const successEmbed = new EmbedBuilder()
         .setColor('#57F287')
         .setTitle('Registro concluido')
-        .setDescription('Acesso liberado. Agora escolha seus idiomas no canal de anuncios.')
+        .setDescription('Acesso liberado. Agora escolha seus idiomas no canal \uD83C\uDF10-idiomas.')
         .setTimestamp();
 
       await interaction.reply({ embeds: [successEmbed], ephemeral: true });
