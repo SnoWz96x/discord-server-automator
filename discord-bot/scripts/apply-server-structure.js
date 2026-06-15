@@ -6,6 +6,7 @@ const {
   Client,
   EmbedBuilder,
   GatewayIntentBits,
+  MessageType,
   PermissionFlagsBits,
 } = require('discord.js');
 const path = require('path');
@@ -413,6 +414,42 @@ async function clearRecentBotMessages(channel, reason) {
   if (botMessages.size > 0) log(`${reason}: removed ${botMessages.size} old bot message(s) in #${channel.name}`);
 }
 
+async function clearOfficialInfoMessages(channel, key) {
+  if (!channel || dryRun) return 0;
+
+  let removed = 0;
+  let before;
+
+  for (let page = 0; page < 3; page++) {
+    const options = before ? { limit: 100, before } : { limit: 100 };
+    const messages = await channel.messages.fetch(options).catch(() => null);
+    if (!messages?.size) break;
+
+    before = messages.last()?.id;
+    const officialMessages = messages.filter(message =>
+      message.author.id === client.user.id &&
+      message.embeds.some(existing => existing.footer?.text === key)
+    );
+    const pinNotifications = messages.filter(message =>
+      message.author.id === client.user.id &&
+      message.type === MessageType.ChannelPinnedMessage
+    );
+
+    for (const message of [...officialMessages.values(), ...pinNotifications.values()]) {
+      await message.delete().then(() => {
+        removed += 1;
+      }).catch(error => {
+        console.error(`Could not delete official info message in #${channel.name}:`, error.message);
+      });
+    }
+
+    if (messages.size < 100) break;
+  }
+
+  if (removed > 0) log(`info refresh cleaned: #${channel.name} ${key} (${removed})`);
+  return removed;
+}
+
 async function cleanupLegacyLanguagePanels(guild, targetChannelId, roleIds) {
   if (!roleIds.length || dryRun) return;
 
@@ -601,17 +638,27 @@ async function assignOwnerRole(guild) {
 async function ensureInfoMessage(channel, key, embed) {
   if (!channel) return;
 
-  if (!refreshInfo) {
-    const recent = await channel.messages.fetch({ limit: 50 }).catch(() => null);
-    const exists = recent?.some(message =>
-      message.author.id === client.user.id &&
-      message.embeds.some(existing => existing.footer?.text === key)
-    );
+  const recent = await channel.messages.fetch({ limit: 100 }).catch(() => null);
+  const existing = recent?.filter(message =>
+    message.author.id === client.user.id &&
+    message.embeds.some(current => current.footer?.text === key)
+  );
 
-    if (exists) {
-      log(`info message exists: #${channel.name} ${key}`);
-      return;
+  if (refreshInfo) {
+    await clearOfficialInfoMessages(channel, key);
+  } else if (existing?.size > 0) {
+    const keep = existing.first();
+    const duplicates = existing.filter(message => message.id !== keep.id);
+
+    for (const message of duplicates.values()) {
+      await message.delete().catch(error => {
+        console.error(`Could not delete duplicate info message in #${channel.name}:`, error.message);
+      });
     }
+
+    if (duplicates.size > 0) log(`duplicate info messages cleaned: #${channel.name} ${key} (${duplicates.size})`);
+    log(`info message exists: #${channel.name} ${key}`);
+    return;
   }
 
   if (dryRun) {
