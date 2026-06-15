@@ -584,6 +584,25 @@ async function assignOwnerRole(guild) {
   if (gotinha) await member.roles.add(gotinha, 'Gota DAgua member sync').catch(() => {});
 }
 
+async function syncBotNickname(guild) {
+  if (dryRun || !blueprint.botNickname) {
+    if (blueprint.botNickname) log(`would set bot nickname: ${blueprint.botNickname}`);
+    return;
+  }
+
+  const botMember = await guild.members.fetch(client.user.id).catch(() => null);
+  if (!botMember) return;
+  if (botMember.displayName === blueprint.botNickname) {
+    log(`bot nickname exists: ${blueprint.botNickname}`);
+    return;
+  }
+
+  await botMember.setNickname(blueprint.botNickname, 'Gota DAgua bot nickname setup').catch(error => {
+    console.error(`Could not set bot nickname: ${error.message}`);
+  });
+  log(`bot nickname synced: ${blueprint.botNickname}`);
+}
+
 client.once('clientReady', async () => {
   try {
     const guild = await client.guilds.fetch(guildId);
@@ -606,6 +625,7 @@ client.once('clientReady', async () => {
     }
 
     await assignOwnerRole(guild);
+    await syncBotNickname(guild);
     await sendInfoMessages(guild);
     log('Gota DAgua structure applied.');
   } catch (error) {
