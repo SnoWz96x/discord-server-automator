@@ -23,9 +23,13 @@ module.exports = {
     const embed = new EmbedBuilder()
       .setColor('#57F287')
       .setTitle('Compra concluida')
-      .setDescription(`Voce comprou **${result.item.name}** por **${result.item.price_coins.toLocaleString('pt-BR')} PokeCoins** + **${(result.item.price_cp || 0).toLocaleString('pt-BR')} CP**.`)
+      .setDescription([
+        `Voce comprou **${result.item.name}** por **${result.item.price_coins.toLocaleString('pt-BR')} PokeCoins** + **${(result.item.price_cp || 0).toLocaleString('pt-BR')} CP**.`,
+        '',
+        'A compra tambem foi registrada no historico publico de compras.'
+      ].join('\n'))
       .setTimestamp();
 
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [embed], ephemeral: true });
   }
 };

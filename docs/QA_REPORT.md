@@ -20,7 +20,7 @@ npm --prefix discord-bot run test:system
 - Smoke tests: passing.
 - System check: passing.
 - Discord commands registered: 37.
-- Discord channels detected: 49.
+- Discord channels detected: 50.
 - User-facing roles detected after cleanup: 19.
 - Managed bot role detected: 1.
 - Shop items seeded: 4.

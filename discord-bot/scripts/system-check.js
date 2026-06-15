@@ -27,13 +27,16 @@ const requiredCommands = [
 ];
 
 const requiredChannelSuffixes = [
+  '-roguepoke',
   '-regras',
-  '-verificação',
+  'verifica',
+  '-idiomas',
   '-announcements',
   '-abrir-ticket',
   '-ticket-transcripts',
   '-mod-logs',
-  '-lojinha'
+  '-lojinha',
+  '-compras'
 ];
 
 function assert(condition, message) {
@@ -41,6 +44,7 @@ function assert(condition, message) {
 }
 
 function hasSuffix(collection, suffix) {
+  if (!suffix.startsWith('-')) return collection.some(item => item.name.includes(suffix));
   return collection.some(item => item.name.endsWith(suffix));
 }
 
@@ -60,33 +64,41 @@ async function checkDiscord() {
   }
 
   const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers] });
-  await client.login(token);
-  await new Promise(resolve => client.once('clientReady', resolve));
+  try {
+    await client.login(token);
+    await new Promise(resolve => client.once('clientReady', resolve));
 
-  const guild = await client.guilds.fetch(guildId);
-  await guild.channels.fetch();
-  await guild.roles.fetch();
+    const guild = await client.guilds.fetch(guildId);
+    await guild.channels.fetch();
+    await guild.roles.fetch();
 
-  const channels = [...guild.channels.cache.values()];
-  for (const suffix of requiredChannelSuffixes) {
-    assert(hasSuffix(channels, suffix), `Missing channel ending with ${suffix}`);
+    const channels = [...guild.channels.cache.values()];
+    for (const suffix of requiredChannelSuffixes) {
+      assert(hasSuffix(channels, suffix), `Missing channel ending with ${suffix}`);
+    }
+
+    const textChannels = guild.channels.cache.filter(channel => channel.type === ChannelType.GuildText);
+    const rules = textChannels.find(channel => channel.name.endsWith('-regras'));
+    const staffLogs = textChannels.find(channel => channel.name.endsWith('-mod-logs'));
+    const shop = textChannels.find(channel => channel.name.endsWith('-lojinha'));
+    const purchases = textChannels.find(channel => channel.name.endsWith('-compras'));
+    assert(rules, 'Rules channel not found');
+    assert(staffLogs, 'Mod logs channel not found');
+    assert(shop, 'Shop channel not found');
+    assert(purchases, 'Purchase history channel not found');
+    assert(!rules.permissionsFor(guild.roles.everyone).has(PermissionFlagsBits.SendMessages), 'Rules channel should be locked');
+    assert(!staffLogs.permissionsFor(guild.roles.everyone).has(PermissionFlagsBits.ViewChannel), 'Mod logs should be staff-only');
+    assert(!shop.permissionsFor(guild.roles.everyone).has(PermissionFlagsBits.SendMessages), 'Shop channel should be locked');
+    assert(!purchases.permissionsFor(guild.roles.everyone).has(PermissionFlagsBits.SendMessages), 'Purchase history channel should be locked');
+
+    return {
+      commands: commands.length,
+      channels: guild.channels.cache.size,
+      roles: guild.roles.cache.size
+    };
+  } finally {
+    client.destroy();
   }
-
-  const textChannels = guild.channels.cache.filter(channel => channel.type === ChannelType.GuildText);
-  const rules = textChannels.find(channel => channel.name.endsWith('-regras'));
-  const staffLogs = textChannels.find(channel => channel.name.endsWith('-mod-logs'));
-  assert(rules, 'Rules channel not found');
-  assert(staffLogs, 'Mod logs channel not found');
-  assert(!rules.permissionsFor(guild.roles.everyone).has(PermissionFlagsBits.SendMessages), 'Rules channel should be locked');
-  assert(!staffLogs.permissionsFor(guild.roles.everyone).has(PermissionFlagsBits.ViewChannel), 'Mod logs should be staff-only');
-
-  client.destroy();
-
-  return {
-    commands: commands.length,
-    channels: guild.channels.cache.size,
-    roles: guild.roles.cache.size
-  };
 }
 
 function checkDatabase() {

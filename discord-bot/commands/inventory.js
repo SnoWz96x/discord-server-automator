@@ -24,6 +24,10 @@ module.exports = {
       .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
       .setTimestamp();
 
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [embed], ephemeral: isShopChannel(interaction.channel) });
   }
 };
+
+function isShopChannel(channel) {
+  return channel?.name?.endsWith('-lojinha') || channel?.name?.endsWith('-compras');
+}

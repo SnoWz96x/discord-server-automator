@@ -27,9 +27,9 @@ module.exports = {
 
     const description = items.map(item => [
       `**${item.name}**`,
-      `ID: \`${item.key}\` · Categoria: **${item.category || 'general'}**`,
+      `ID: \`${item.key}\` - Categoria: **${item.category || 'general'}**`,
       item.description,
-      `Preco: **${item.price_coins.toLocaleString('pt-BR')} PokeCoins** + **${(item.price_cp || 0).toLocaleString('pt-BR')} CP** · Nivel minimo: **${item.min_level}**`,
+      `Preco: **${item.price_coins.toLocaleString('pt-BR')} PokeCoins** + **${(item.price_cp || 0).toLocaleString('pt-BR')} CP** - Nivel minimo: **${item.min_level}**`,
       item.stock == null ? null : `Estoque: **${item.stock}**`,
       item.available_until ? `Disponivel ate: **${item.available_until}**` : null
     ].filter(Boolean).join('\n')).join('\n\n');
@@ -38,9 +38,9 @@ module.exports = {
       .setColor('#FEE75C')
       .setTitle(category ? `Lojinha RoguePoke - ${category}` : 'Lojinha RoguePoke')
       .setDescription(description.slice(0, 4096))
-      .setFooter({ text: 'Use /buy item:<id> para comprar.' })
+      .setFooter({ text: 'Use /buy item:<id>. O resultado da compra aparece so para voce; o historico publico vai para o canal de compras.' })
       .setTimestamp();
 
-    await interaction.reply({ embeds: [embed] });
+    await interaction.reply({ embeds: [embed], ephemeral: true });
   }
 };

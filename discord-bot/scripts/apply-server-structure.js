@@ -636,6 +636,7 @@ async function sendInfoMessages(guild) {
   const supportChannel = state.channels.get('open_ticket');
   const staffDashboard = state.channels.get('staff_dashboard');
   const shopChannel = state.channels.get('shop');
+  const purchaseHistoryChannel = state.channels.get('purchase_history');
   const hallOfFameChannel = state.channels.get('hall_of_fame');
 
   await ensureInfoMessage(startChannel, 'roguepoke:start:v1', new EmbedBuilder()
@@ -770,27 +771,40 @@ async function sendInfoMessages(guild) {
     .setTimestamp());
 
   const shopItems = blueprint.shopItems || [];
+  if (refreshInfo) await clearRecentBotMessages(shopChannel, 'shop refresh');
   await ensureInfoMessage(shopChannel, 'roguepoke:shop:v1', new EmbedBuilder()
     .setColor('#FEE75C')
-    .setTitle('🛒 Lojinha RoguePoke')
+    .setTitle('Lojinha RoguePoke')
     .setDescription([
-      'Use suas **PokeCoins** e **CP** para comprar badges e cosmeticos.',
+      'Este canal e o catalogo oficial da economia RoguePoke.',
+      'Os comandos da lojinha respondem de forma privada para manter a vitrine limpa.',
       '',
-      '**Como ganhar coins:**',
+      '**Como ganhar PokeCoins e CP:**',
       '- `/daily`, `/weekly` e `/work`',
       '- ficar em canais de voz ativos',
-      '- participar de eventos futuros',
+      '- completar quests e participar de eventos',
       '',
       '**Como comprar:**',
       '1. Veja itens com `/shop`.',
       '2. Compre com `/buy item:<id>`.',
       '3. Veja compras com `/inventory`.',
-      '4. Badges compradas aparecem em `/badges` e como cargos no seu perfil.',
+      '4. Badges compradas aparecem em `/badges` e podem virar cargos no perfil.',
+      '5. Compras publicas aparecem no historico em compras.',
       '',
-      shopItems.map(item => `• \`${item.key}\` - ${item.name} (${item.priceCoins} PokeCoins + ${item.priceCp || 0} CP, nivel ${item.minLevel || 0})`).join('\n')
+      shopItems.map(item => `- \`${item.key}\` - ${item.name} (${item.priceCoins} PokeCoins + ${item.priceCp || 0} CP, nivel ${item.minLevel || 0})`).join('\n')
     ].join('\n'))
     .setTimestamp());
 
+  await ensureInfoMessage(purchaseHistoryChannel, 'roguepoke:purchases:v1', new EmbedBuilder()
+    .setColor('#2DD4BF')
+    .setTitle('Historico de compras')
+    .setDescription([
+      'Este canal mostra compras feitas pela comunidade com PokeCoins e CP.',
+      '',
+      'Ele e publico para membros verificados, mas travado para manter o historico limpo.',
+      'Use a lojinha para ver o catalogo e `/buy item:<id>` para comprar.'
+    ].join('\n'))
+    .setTimestamp());
   await ensureInfoMessage(staffDashboard, 'roguepoke:staff:v1', new EmbedBuilder()
     .setColor('#2DD4BF')
     .setTitle('📊 Staff Ops')

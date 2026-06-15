@@ -45,6 +45,26 @@ References reviewed:
 - Creature evolution, rarity collection log and seasonal captures.
 - Anti-farming rules for XP/coins/CP.
 
+## Economy Channel Pattern
+
+Use three different surfaces instead of mixing everything in one channel:
+
+- Catalog channel: locked, contains official shop copy and item highlights.
+- Private command responses: `/shop`, `/buy`, `/inventory`, `/balance` and `/badges` should avoid polluting the catalog.
+- Public purchase history: locked for members, visible to verified users, receives automatic purchase receipts.
+
+This mirrors the product idea behind Loritta's economy: a central currency, clear ways to earn it, desirable cosmetic/progression spending and social proof without turning the shop channel into chat noise.
+
+## Loritta-Inspired Economy Ideas
+
+- Daily reward page/command as the simplest earning loop.
+- Transfer/pay command between users.
+- Profile customization with backgrounds, titles and cosmetic effects.
+- Raffles/giveaways using the currency.
+- Betting/minigame modules with strict anti-abuse limits.
+- Transaction history and user-facing economy statements.
+- Rotating cosmetic shop with rarity-based prices.
+
 ## Priority 4 - Moderation Depth
 
 - Configurable punishment ladder per rule type.

@@ -288,7 +288,15 @@
           "key": "shop",
           "name": "🛒-lojinha",
           "type": "text",
-          "topic": "Lojinha RoguePoke: compre badges e cosmeticos com PokeCoins.",
+          "topic": "Catalogo da lojinha RoguePoke. Use comandos de compra com resposta privada.",
+          "locked": true,
+          "memberOnly": true
+        },
+        {
+          "key": "purchase_history",
+          "name": "🧾-compras",
+          "type": "text",
+          "topic": "Historico publico de compras da comunidade RoguePoke.",
           "locked": true,
           "memberOnly": true
         },

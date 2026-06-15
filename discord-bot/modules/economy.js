@@ -1,3 +1,5 @@
+const { ChannelType, EmbedBuilder } = require('discord.js');
+
 module.exports = {
   name: 'economy',
 
@@ -181,7 +183,37 @@ module.exports = {
       }
     }
 
+    await this.publishPurchase(guildId, userId, item, client, options).catch(error => {
+      console.error('Error publishing purchase:', error);
+    });
+
     return { success: true, item };
+  },
+
+  async publishPurchase(guildId, userId, item, client, options = {}) {
+    const guild = options.member?.guild || client.guilds?.cache?.get(guildId);
+    if (!guild) return;
+
+    const channel = guild.channels.cache.find(current =>
+      current.type === ChannelType.GuildText &&
+      (current.name === '🧾-compras' || current.name.endsWith('-compras'))
+    );
+    if (!channel) return;
+
+    const user = options.member?.user || await client.users.fetch(userId).catch(() => null);
+    const embed = new EmbedBuilder()
+      .setColor('#2DD4BF')
+      .setTitle('Compra registrada')
+      .setDescription([
+        `${user ? `${user}` : `<@${userId}>`} comprou **${item.name}**.`,
+        '',
+        `Custo: **${Number(item.price_coins || 0).toLocaleString('pt-BR')} PokeCoins** + **${Number(item.price_cp || 0).toLocaleString('pt-BR')} CP**`,
+        `Categoria: **${item.category || 'general'}**`
+      ].join('\n'))
+      .setTimestamp();
+
+    if (user?.displayAvatarURL) embed.setThumbnail(user.displayAvatarURL());
+    await channel.send({ embeds: [embed] });
   },
 
   getLeaderboard(guildId, client) {
