@@ -19,6 +19,7 @@ const ticketsModule = require('../modules/tickets');
 const dryRun = process.argv.includes('--dry-run');
 const refreshPanels = process.argv.includes('--refresh-panels');
 const refreshInfo = process.argv.includes('--refresh-info');
+const refreshInteractivePanels = refreshPanels || refreshInfo;
 
 const token = process.env.DISCORD_TOKEN;
 const guildId = process.env.GUILD_ID;
@@ -494,7 +495,7 @@ async function sendVerificationPanel(guild) {
   if (!channel || !memberRole) return;
 
   const existingConfig = db.getVerificationConfig(guild.id);
-  if (existingConfig && !refreshPanels) {
+  if (existingConfig && !refreshInteractivePanels) {
     log('verification panel already configured; use --refresh-panels to send a new one');
     return;
   }
@@ -504,7 +505,7 @@ async function sendVerificationPanel(guild) {
     return;
   }
 
-  if (refreshPanels) await clearRecentBotMessages(channel, 'verification refresh');
+  if (refreshInteractivePanels) await clearRecentBotMessages(channel, 'verification refresh');
 
   db.setVerificationConfig(guild.id, {
     enabled: true,
@@ -537,7 +538,7 @@ async function sendLanguagePanel() {
   if (!channel) return;
 
   const existingRoles = db.db.prepare('SELECT COUNT(*) as count FROM reaction_roles WHERE guild_id = ? AND channel_id = ?').get(channel.guild.id, channel.id);
-  if (existingRoles.count > 0 && !refreshPanels) {
+  if (existingRoles.count > 0 && !refreshInteractivePanels) {
     log('language panel already configured; use --refresh-panels to send a new one');
     return;
   }
@@ -547,7 +548,7 @@ async function sendLanguagePanel() {
     return;
   }
 
-  if (refreshPanels) await clearRecentBotMessages(channel, 'language refresh');
+  if (refreshInteractivePanels) await clearRecentBotMessages(channel, 'language refresh');
 
   const roles = panel.roles
     .map(item => ({ ...item, roleObject: state.roles.get(item.role) }))
@@ -585,7 +586,7 @@ async function sendTicketPanel(guild) {
   if (!channel || !staffRole) return;
 
   const existingConfig = db.getTicketConfig(guild.id);
-  if (existingConfig && !refreshPanels) {
+  if (existingConfig && !refreshInteractivePanels) {
     log('ticket panel already configured; use --refresh-panels to send a new one');
     return;
   }
@@ -595,7 +596,7 @@ async function sendTicketPanel(guild) {
     return;
   }
 
-  if (refreshPanels) await clearRecentBotMessages(channel, 'ticket refresh');
+  if (refreshInteractivePanels) await clearRecentBotMessages(channel, 'ticket refresh');
 
   db.setTicketConfig(guild.id, {
     enabled: true,
@@ -675,6 +676,7 @@ async function ensureInfoMessage(channel, key, embed) {
 async function sendInfoMessages(guild) {
   const startChannel = state.channels.get('start_here');
   const rulesChannel = state.channels.get('rules');
+  const verificationChannel = state.channels.get('verification');
   const languageChannel = state.channels.get('language_select');
   const faqChannel = state.channels.get('faq');
   const wikiChannel = state.channels.get('wiki');
@@ -723,6 +725,17 @@ async function sendInfoMessages(guild) {
       '**7. Decisao da staff.** A equipe pode remover conteudo, silenciar, expulsar ou banir para proteger a comunidade.',
       '',
       'Ao permanecer no servidor, voce aceita estas regras e as Community Guidelines do Discord.'
+    ].join('\n'))
+    .setTimestamp());
+
+  await ensureInfoMessage(verificationChannel, 'roguepoke:verification-info:v1', new EmbedBuilder()
+    .setColor('#57F287')
+    .setTitle('Registro RoguePoke')
+    .setDescription([
+      'Use o painel abaixo para liberar seu acesso inicial ao servidor.',
+      '',
+      'Ao entrar, voce recebe o cargo de membro e passa a ver os canais da comunidade.',
+      'Depois disso, escolha seus idiomas no canal de idiomas.'
     ].join('\n'))
     .setTimestamp());
 
